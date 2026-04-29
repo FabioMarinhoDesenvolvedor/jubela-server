@@ -8,10 +8,12 @@ import {
   Patch,
   Post,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TokenPayloadDTO } from 'src/auth/dto/token-payload.dto';
+import { CronJobGuard } from 'src/auth/guards/cron-job.guard';
 import { TokenPayloadParam } from 'src/auth/params/token-payload.param';
 import { EmailService } from 'src/email/email.service';
 import { Order } from 'src/orders/entities/order.entity';
@@ -72,6 +74,7 @@ export class CheckoutController {
     return { received: true };
   }
 
+  @UseGuards(CronJobGuard)
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Post('payment-check/:orderId')
   async CheckPayment(
