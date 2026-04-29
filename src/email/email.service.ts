@@ -1,12 +1,10 @@
+import { MailerService } from '@nestjs-modules/mailer';
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { ConfigType } from '@nestjs/config';
-import * as sgMail from '@sendgrid/mail';
 import * as ejs from 'ejs';
 import { join } from 'path';
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
@@ -15,41 +13,36 @@ import { EmailTemplateData } from 'src/interfaces/email-template';
 import { Order } from 'src/orders/entities/order.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { ErrorManagement } from 'src/utils/error.util';
-import emailConfig from './config/email.config';
 import { RTAlertDTO } from './dto/rt-alert.dto';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(
-    @Inject(emailConfig.KEY)
-    private readonly emailConfiguration: ConfigType<typeof emailConfig>,
-  ) {
-    sgMail.setApiKey(emailConfiguration.sendgridApiKey);
-  }
+  constructor(private readonly mailerService: MailerService) {}
 
   async SendRTAlertEmployees(alertData: RTAlertDTO, forSupportTeam: boolean) {
     try {
-      // Renderizar template
       const html = await this.RenderTemplate(
         'refresh-token-alert-employees',
         alertData,
       );
 
-      // Enviar email
-      const info: sgMail.MailDataRequired = {
-        from: process.env.FROM_EMAIL,
+      // Tirar em produção depois de testar (a variável send e o log)
+      const send = await this.mailerService.sendMail({
         to: forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email,
         subject: 'Alerta de segurança',
-        html,
-      };
-
-      await sgMail.send(info);
+        template: html,
+        context: {
+          ...alertData,
+        },
+      });
 
       this.logger.log(
-        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}`,
+        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}\n`,
       );
+
+      this.logger.log(send);
 
       return {
         success: true,
@@ -66,22 +59,23 @@ export class EmailService {
 
   async SendRTAlertUsers(alertData: RTAlertDTO, forSupportTeam: boolean) {
     try {
-      // Renderizar template
       const html = await this.RenderTemplate('user-session-alert', alertData);
 
-      // Enviar email
-      const info: sgMail.MailDataRequired = {
-        from: process.env.FROM_EMAIL,
+      // Tirar em produção depois de testar (a variável send e o log)
+      const send = await this.mailerService.sendMail({
         to: forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email,
         subject: 'Alerta de segurança',
-        html,
-      };
-
-      await sgMail.send(info);
+        template: html,
+        context: {
+          ...alertData,
+        },
+      });
 
       this.logger.log(
-        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}`,
+        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}\n`,
       );
+
+      this.logger.log(send);
 
       return {
         success: true,
@@ -98,14 +92,11 @@ export class EmailService {
 
   async LogIssue(userOrEmployeeLog: string) {
     try {
-      const info = {
-        from: process.env.FROM_EMAIL,
+      await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
         subject: `Erro ao criar logs de ${userOrEmployeeLog}`,
-        html: '<h1>Erro na cração de logs do usuário</h1>',
-      };
-
-      await sgMail.send(info);
+        template: '<h1>Erro na cração de logs do usuário</h1>',
+      });
 
       this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}`);
 
@@ -130,17 +121,19 @@ export class EmailService {
         resetPasswordLink,
       });
 
-      // Enviar email
-      const info: sgMail.MailDataRequired = {
-        from: process.env.FROM_EMAIL,
+      // Tirar em produção depois de testar (a variável send e o log)
+      const send = await this.mailerService.sendMail({
         to: userEmail,
         subject: 'Redefinição de senha',
-        html,
-      };
+        template: html,
+        context: {
+          resetPasswordLink,
+        },
+      });
 
-      await sgMail.send(info);
+      this.logger.log(`Email enviado para ${userEmail}\n`);
 
-      this.logger.log(`Email enviado para ${userEmail}`);
+      this.logger.log(send);
     } catch (error) {
       this.logger.error(`Erro ao enviar email para ${userEmail}`, error);
 
@@ -163,16 +156,19 @@ export class EmailService {
 
       const html = await this.RenderTemplate('stock-alert', productData);
 
-      const info: sgMail.MailDataRequired = {
-        from: process.env.FROM_EMAIL,
+      // Tirar em produção depois de testar
+      const send = await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
         subject: 'Produto com baixo estoque ou esgotado',
-        html,
-      };
+        template: html,
+        context: {
+          ...productData,
+        },
+      });
 
-      await sgMail.send(info);
+      this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}\n`);
 
-      this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}`);
+      this.logger.log(send);
 
       return {
         success: true,
@@ -221,19 +217,31 @@ export class EmailService {
       // Renderizar template
       const html = await this.RenderTemplate('order-status', emailData);
 
-      // Enviar email
-      const info: sgMail.MailDataRequired = {
-        from: process.env.FROM_EMAIL,
+      // Tirar em produção depois de testar
+      const send = await this.mailerService.sendMail({
         to: forEnterprise === true ? process.env.FROM_EMAIL : order.user.email,
         subject: emailData.subject,
-        html,
-      };
-
-      await sgMail.send(info);
+        template: html,
+        context: {
+          forEnterprise,
+          customerName: emailData.customerName,
+          statusMessage: emailData.statusMessage,
+          actionMessage: emailData.actionMessage,
+          orderId: emailData.orderId,
+          orderTotal: emailData.orderTotal,
+          refundAmount: emailData.refundAmount,
+          orderItems: emailData.orderItems,
+          refundedItems: emailData.refundedItems,
+          additionalInfo: emailData.additionalInfo,
+          actionUrl: emailData.actionUrl,
+        },
+      });
 
       this.logger.log(
-        `Email enviado para ${forEnterprise === true ? process.env.FROM_EMAIL : order.user}`,
+        `Email enviado para ${forEnterprise === true ? process.env.FROM_EMAIL : order.user}\n`,
       );
+
+      this.logger.log(send);
 
       return {
         success: true,
