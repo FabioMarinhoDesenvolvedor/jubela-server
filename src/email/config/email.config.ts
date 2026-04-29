@@ -2,7 +2,8 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('email', () => {
   return {
-    sendgridApiKey: process.env.SENDGRID,
+    user: process.env.BREVO_SMTP_USER,
+    password: process.env.BREVO_SMTP_PASS,
     from: process.env.FROM_EMAIL,
   };
 });

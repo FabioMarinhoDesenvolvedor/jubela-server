@@ -1,0 +1,54 @@
+<%
+  icon     = '⚠️';
+  title    = 'Pedido será cancelado em breve';
+  subtitle = 'Restam poucos minutos para finalizar seu pagamento';
+
+  bodyContent = `
+    <p>Seu pedido corre risco de ser cancelado por falta de confirmação de pagamento. Após o cancelamento, os itens serão devolvidos ao estoque e não poderemos garantir a disponibilidade.</p>
+
+    <div class="alert-warning">
+      <strong>Atenção:</strong> caso o pagamento não seja confirmado nos próximos minutos,
+      seu pedido será cancelado automaticamente.
+    </div>
+
+    <div class="amount-highlight">
+      <div class="amount-label">Total do pedido</div>
+      <div class="amount-value">R$ ${(order.totalAmount / 100).toFixed(2).replace('.', ',')}</div>
+    </div>
+
+    <div class="info-box">
+      <div class="info-box-label">Detalhes</div>
+
+      <div class="info-row">
+        <span class="info-key">Nº do pedido</span>
+        <span class="info-value">#${order.id}</span>
+      </div>
+
+      <div class="info-row">
+        <span class="info-key">Status</span>
+        <span class="info-value">
+          <span class="status-badge status-pending">Pagamento pendente</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="items-list">
+      ${order.items.map(item => `
+        <div class="item-row">
+          <span class="item-name">
+            ${item.product_name}
+            <span class="item-qty">× ${item.quantity}</span>
+          </span>
+          <span class="item-price">
+            R$ ${((item.price * item.quantity) / 100).toFixed(2).replace('.', ',')}
+          </span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="cta-wrapper">
+      <a href="${checkoutUrl}" class="cta-button">Pagar agora</a>
+    </div>
+  `;
+%>
+<%- include('email-base') %>

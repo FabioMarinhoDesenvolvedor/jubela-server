@@ -1,0 +1,42 @@
+<%
+  icon     = '⏳';
+  title    = 'Seu pedido aguarda pagamento';
+  subtitle = 'Finalize sua compra antes que os itens esgotem';
+
+  bodyContent = `
+    <p>Identificamos que seu pedido ainda não foi pago. Complete o pagamento para garantir os itens reservados para você.</p>
+
+    <div class="alert-info">
+      Os itens do seu pedido estão reservados por tempo limitado.
+      Após esse período, a reserva será liberada automaticamente.
+    </div>
+
+    <div class="info-box">
+      <div class="info-box-label">Resumo do pedido</div>
+
+      <div class="info-row">
+        <span class="info-key">Nº do pedido</span>
+        <span class="info-value">#${order.id}</span>
+      </div>
+
+      <div class="info-row">
+        <span class="info-key">Total</span>
+        <span class="info-value">R$ ${(order.totalAmount / 100).toFixed(2).replace('.', ',')}</span>
+      </div>
+
+      <div class="info-row">
+        <span class="info-key">Status</span>
+        <span class="info-value">
+          <span class="status-badge status-pending">Aguardando pagamento</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="cta-wrapper">
+      <a href="${checkoutUrl}" class="cta-button">Concluir pagamento</a>
+      <br />
+      <a href="${storeUrl}/support" class="cta-button-outline">Preciso de ajuda</a>
+    </div>
+  `;
+%>
+<%- include('email-base') %>
