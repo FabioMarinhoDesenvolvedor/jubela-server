@@ -17,10 +17,6 @@ export class Employee {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 14, unique: true })
-  @IsString()
-  cpf: string;
-
   @Column({ type: 'varchar', length: 50, unique: true })
   @IsEmail()
   email: string;
