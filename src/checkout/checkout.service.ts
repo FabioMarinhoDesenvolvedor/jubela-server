@@ -681,6 +681,19 @@ export class CheckoutService {
 
       const response = await res.json();
 
+      const addCheckoutUrl = await this.ordersRepository.update(
+        createOrder.orderId,
+        {
+          checkoutUrl: response,
+        },
+      );
+
+      if (!addCheckoutUrl || addCheckoutUrl.affected === 0) {
+        throw new InternalServerErrorException(
+          'Erro ao atualizar dados de pedido',
+        );
+      }
+
       await this.SchedulePaymentCheck(createOrder.orderId, 1);
 
       return response;

@@ -84,6 +84,9 @@ export class Order {
   @JoinColumn()
   paymentConfirmation: PaymentConfirmation;
 
+  @Column({ type: 'varchar', length: 500, name: 'checkout_url' })
+  checkoutUrl: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
