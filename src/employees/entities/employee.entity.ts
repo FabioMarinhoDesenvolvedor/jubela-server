@@ -47,14 +47,6 @@ export class Employee {
   })
   situation: EmployeeSituation;
 
-  @Column({ type: 'varchar', length: 15 })
-  @IsString()
-  phone_number: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  @IsString()
-  address: string;
-
   @OneToMany(() => Product, (product) => product.employee)
   products: Product[];
 

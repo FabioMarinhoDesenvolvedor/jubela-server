@@ -32,14 +32,11 @@ export class EmployeesService {
     );
 
     const employeeCreateData = {
-      cpf: createEmployeeDTO.cpf,
       email: createEmployeeDTO.email,
       name: createEmployeeDTO.name,
       password_hash,
       role: createEmployeeDTO.role,
       situation: createEmployeeDTO.situation,
-      phone_number: createEmployeeDTO.phone_number,
-      address: createEmployeeDTO.address,
     };
 
     const employeeCreate = this.employeeRepository.create(employeeCreateData);
@@ -75,8 +72,6 @@ export class EmployeesService {
       email: updateEmployeeDTO.email,
       name: updateEmployeeDTO.name,
       password_hash: updateEmployeeDTO.password,
-      phone_number: updateEmployeeDTO.phone_number,
-      address: updateEmployeeDTO.address,
     };
 
     if (id !== tokenPayloadDTO.sub) {
@@ -135,8 +130,6 @@ export class EmployeesService {
       password_hash: updateEmployeeAdminDTO.password,
       role: updateEmployeeAdminDTO.role,
       situation: updateEmployeeAdminDTO.situation,
-      phone_number: updateEmployeeAdminDTO.phone_number,
-      address: updateEmployeeAdminDTO.address,
     };
 
     if (!tokenPayloadDTO.role.includes(EmployeeRole.ADMIN)) {
@@ -149,6 +142,10 @@ export class EmployeesService {
       },
     });
 
+    if (!findEmployeeById) {
+      throw new NotFoundException('Funcionário não encontrado');
+    }
+
     // Não deixa atualizar outros admins
     for (let i = 0; i < findEmployeeById.role.length; i++) {
       if (
@@ -157,10 +154,6 @@ export class EmployeesService {
       ) {
         throw new ForbiddenException('Ação não permitida');
       }
-    }
-
-    if (!findEmployeeById) {
-      throw new NotFoundException('Funcionário não encontrado');
     }
 
     const employeeUpdate = await this.employeeRepository.preload({
@@ -230,19 +223,6 @@ export class EmployeesService {
     }
 
     return [total, ...employeeFindByName];
-  }
-
-  async FindByPhoneNumber(phoneNumber: string) {
-    const employeeFindByPhoneNumber = await this.employeeRepository.findOneBy({
-      phone_number: phoneNumber,
-      situation: EmployeeSituation.EMPLOYED,
-    });
-
-    if (!employeeFindByPhoneNumber) {
-      throw new NotFoundException('Funcionário não encontrado');
-    }
-
-    return employeeFindByPhoneNumber;
   }
 
   async FindByRole(paginationByRoleDTO: PaginationByRoleDTO) {

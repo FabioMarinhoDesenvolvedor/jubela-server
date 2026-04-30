@@ -13,17 +13,6 @@ import { Product } from 'src/products/entities/product.entity';
 
 export class CreateEmployeeDTO {
   @IsNotEmpty({
-    message: 'campo "cpf" não preenchido',
-  })
-  @IsString({
-    message: 'campo "cpf" deve estar em formato de texto',
-  })
-  @Length(14, 14, {
-    message: 'O cpf deve estar no formato 000.000.000-00',
-  })
-  readonly cpf: string;
-
-  @IsNotEmpty({
     message: 'campo "email" não preenchido',
   })
   @IsString({
@@ -73,28 +62,6 @@ export class CreateEmployeeDTO {
     message: 'Situação do funcionário inválida',
   })
   readonly situation: EmployeeSituation;
-
-  @IsNotEmpty({
-    message: 'campo "telefone" não preenchido',
-  })
-  @IsString({
-    message: 'campo "telefone" deve estar em formato de texto',
-  })
-  @Length(15, 15, {
-    message: 'campo "telefone" deve ter estar no formato (00) 00000 0000',
-  })
-  readonly phone_number: string;
-
-  @IsNotEmpty({
-    message: 'campo "endereço" não preenchido',
-  })
-  @IsString({
-    message: 'campo "endereço" deve estar em formato de texto',
-  })
-  @Length(0, 100, {
-    message: 'O campo "endereço não deve passar dos 100 caracteres',
-  })
-  readonly address: string;
 
   @IsOptional()
   readonly products: Product[];
