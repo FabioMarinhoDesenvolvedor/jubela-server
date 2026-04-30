@@ -278,7 +278,7 @@ export class RefreshTokensService {
           UPDATE refresh_token_employee
           SET is_valid = false
           WHERE token_id = $1
-            AND employee = $2
+            AND "employeeId" = $2
             AND is_valid = true
           RETURNING *
         `,
@@ -359,7 +359,7 @@ export class RefreshTokensService {
           UPDATE refresh_token_user
           SET is_valid = false
           WHERE token_id = $1
-            AND user = $2
+            AND "userId" = $2
             AND is_valid = true
           RETURNING *
         `,
