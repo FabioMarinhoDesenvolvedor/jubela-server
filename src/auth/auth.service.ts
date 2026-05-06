@@ -457,13 +457,11 @@ export class AuthService {
       googleUser.email,
     );
 
-    if (createUser.password_hash) {
-      throw new BadRequestException(
-        'Conta do usuário já registrada via sistema',
-      );
-    }
-
     if (createUser && createUser.password_hash === null) return createUser;
+
+    if (createUser.password_hash) {
+      throw new BadRequestException('Conta do usuário já registrada');
+    }
 
     return await this.userService.Create(googleUser);
   }
