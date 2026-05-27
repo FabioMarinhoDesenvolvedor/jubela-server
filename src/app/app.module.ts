@@ -7,7 +7,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from 'src/auth/auth.module';
 import { AuthTokenGuard } from 'src/auth/guards/auth-token.guard';
 import { ThrottlerBehindProxyGuard } from 'src/auth/guards/throttler-behind-proxy.guard';
-import { CheckoutModule } from 'src/checkout/checkout.module';
 import { EmailModule } from 'src/email/email.module';
 import { EmployeesModule } from 'src/employees/employee.module';
 import { JWTBlacklistModule } from 'src/jwt-blacklist/jwt-blacklist.module';
@@ -81,7 +80,6 @@ import { AppService } from './app.service';
     JWTBlacklistModule,
     LogsModule,
     EmailModule,
-    CheckoutModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

@@ -7,7 +7,6 @@ import { UsersModule } from 'src/users/user.module';
 import { Items } from './entities/items.entity';
 import { Order } from './entities/order.entity';
 import { PaymentConfirmation } from './entities/payment-confirmation.entity';
-import { OrdersController } from './order.controller';
 import { OrdersService } from './order.service';
 
 @Module({
@@ -17,7 +16,6 @@ import { OrdersService } from './order.service';
     forwardRef(() => ProductsModule),
     forwardRef(() => EmailModule),
   ],
-  controllers: [OrdersController],
   providers: [OrdersService, Logger],
   exports: [
     TypeOrmModule.forFeature([Order, Items, PaymentConfirmation]),
