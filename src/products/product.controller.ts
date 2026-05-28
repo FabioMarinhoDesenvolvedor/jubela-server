@@ -23,7 +23,7 @@ import { SetRoutePolicy } from 'src/auth/decorators/set-route-policy.decorator';
 import { TokenPayloadDTO } from 'src/auth/dto/token-payload.dto';
 import { RoutePolicyGuard } from 'src/auth/guards/route-policy.guard';
 import { TokenPayloadParam } from 'src/auth/params/token-payload.param';
-import { UrlUuidDTO } from 'src/common/dto/url-uuid.dto';
+
 import { EmployeeRole } from 'src/common/enums/employee-role.enum';
 import { CreateProductDTO } from './dto/create-product.dto';
 import { DeleteImagesDTO } from './dto/delete-images.dto';
@@ -175,8 +175,8 @@ export class ProductsController {
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Delete(':id')
   @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
-  Delete(@Param('id') id: UrlUuidDTO) {
-    return this.productsService.Delete(id.id);
+  Delete(@Param('id') id: string) {
+    return this.productsService.Delete(id);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
