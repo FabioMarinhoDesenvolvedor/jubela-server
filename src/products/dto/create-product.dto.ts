@@ -38,8 +38,8 @@ export class CreateProductDTO {
   @IsString({
     message: 'O campo "descrição" deve estar no formato de texto',
   })
-  @Length(10, 255, {
-    message: 'O campo descrição deve ter o comprimento máximo de 255',
+  @Length(10, 600, {
+    message: 'O campo descrição deve ter o comprimento máximo de 600',
   })
   readonly description: string;
 
