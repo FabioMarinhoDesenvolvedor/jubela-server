@@ -20,7 +20,7 @@
 //   @Get('employees')
 //   @SetRoutePolicy(EmployeeRole.READ_ORDERS)
 //   async ListOrders() {
-//     const allOrders = await this.ordersService.ListOrdersEmployees();
+//     const allOrders = await this.ordersService.listOrdersEmployees();
 
 //     if (allOrders.length < 1) {
 //       return {
@@ -34,7 +34,7 @@
 
 //   @Get()
 //   async ListOrdersUsers(@TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO) {
-//     const allOrders = await this.ordersService.ListOrdersUsers(tokenPayloadDTO);
+//     const allOrders = await this.ordersService.listOrdersUsers(tokenPayloadDTO);
 
 //     if (allOrders.length < 1) {
 //       return {
@@ -49,7 +49,7 @@
 //   @Get('search/price/employees')
 //   @SetRoutePolicy(EmployeeRole.READ_ORDERS)
 //   FindByPriceEmployees(@Query() paginationByPriceDTO: PaginationByPriceDTO) {
-//     return this.ordersService.FindByPriceEmployees(paginationByPriceDTO);
+//     return this.ordersService.findByPriceEmployees(paginationByPriceDTO);
 //   }
 
 //   @Get('search/price/users')
@@ -57,7 +57,7 @@
 //     @Query() paginationByPriceDTO: PaginationByPriceDTO,
 //     @TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO,
 //   ) {
-//     return this.ordersService.FindByPriceUsers(
+//     return this.ordersService.findByPriceUsers(
 //       paginationByPriceDTO,
 //       tokenPayloadDTO,
 //     );
@@ -66,7 +66,7 @@
 //   @Get('search/item/employees')
 //   @SetRoutePolicy(EmployeeRole.READ_ORDERS)
 //   FindByItemEmployees(@Query() paginationDTO: PaginationDTO) {
-//     return this.ordersService.FindByItemEmployees(paginationDTO);
+//     return this.ordersService.findByItemEmployees(paginationDTO);
 //   }
 
 //   @Get('search/item/users')
@@ -74,18 +74,18 @@
 //     @Query() paginationDTO: PaginationDTO,
 //     @TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO,
 //   ) {
-//     return this.ordersService.FindByItemUsers(paginationDTO, tokenPayloadDTO);
+//     return this.ordersService.findByItemUsers(paginationDTO, tokenPayloadDTO);
 //   }
 
 //   @Get('search/user')
 //   @SetRoutePolicy(EmployeeRole.READ_ORDERS)
 //   FindByUser(@Query() paginationByUserDTO: PaginationByUserDTO) {
-//     return this.ordersService.FindByUser(paginationByUserDTO);
+//     return this.ordersService.findByUser(paginationByUserDTO);
 //   }
 
 //   @Get('search/status')
 //   @SetRoutePolicy(EmployeeRole.READ_ORDERS)
 //   FindByStatus(@Query() paginationByStatusDTO: PaginationByStatusDTO) {
-//     return this.ordersService.FindByStatus(paginationByStatusDTO);
+//     return this.ordersService.findByStatus(paginationByStatusDTO);
 //   }
 // }

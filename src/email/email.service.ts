@@ -8,7 +8,7 @@ import * as ejs from 'ejs';
 import { join } from 'path';
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { Product } from 'src/products/entities/product.entity';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { RTAlertDTO } from './dto/rt-alert.dto';
 
 @Injectable()
@@ -17,9 +17,9 @@ export class EmailService {
 
   constructor(private readonly mailerService: MailerService) {}
 
-  async SendRTAlertEmployees(alertData: RTAlertDTO, forSupportTeam: boolean) {
+  async sendRTAlertEmployees(alertData: RTAlertDTO, forSupportTeam: boolean) {
     try {
-      const html = await this.RenderTemplate(
+      const html = await this.renderTemplate(
         'refresh-token-alert-employees',
         alertData,
       );
@@ -50,9 +50,9 @@ export class EmailService {
     }
   }
 
-  async SendRTAlertUsers(alertData: RTAlertDTO, forSupportTeam: boolean) {
+  async sendRTAlertUsers(alertData: RTAlertDTO, forSupportTeam: boolean) {
     try {
-      const html = await this.RenderTemplate('user-session-alert', alertData);
+      const html = await this.renderTemplate('user-session-alert', alertData);
 
       await this.mailerService.sendMail({
         to: forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email,
@@ -80,7 +80,7 @@ export class EmailService {
     }
   }
 
-  async LogIssue(userOrEmployeeLog: string) {
+  async logIssue(userOrEmployeeLog: string) {
     try {
       await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
@@ -103,11 +103,11 @@ export class EmailService {
     }
   }
 
-  async ResetPassword(userEmail: string, tokenHash: string) {
+  async resetPassword(userEmail: string, tokenHash: string) {
     try {
       const resetPasswordLink = `https://jubela-client.vercel.app/reset-senha/?token=${tokenHash}`;
 
-      const html = await this.RenderTemplate('password-reset', {
+      const html = await this.renderTemplate('password-reset', {
         resetPasswordLink,
       });
 
@@ -132,7 +132,7 @@ export class EmailService {
     }
   }
 
-  async LowStockWarn(product: Product) {
+  async lowStockWarn(product: Product) {
     try {
       const productData = {
         productRanOut: product.quantity < 1 ? true : false,
@@ -141,7 +141,7 @@ export class EmailService {
         stock: product.quantity,
       };
 
-      const html = await this.RenderTemplate('stock-alert', productData);
+      const html = await this.renderTemplate('stock-alert', productData);
 
       await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
@@ -167,7 +167,7 @@ export class EmailService {
     }
   }
 
-  private async RenderTemplate(templateFile: string, data: any) {
+  private async renderTemplate(templateFile: string, data: any) {
     try {
       const templatePath = join(
         process.cwd(),
@@ -179,7 +179,7 @@ export class EmailService {
       const html = (await ejs.renderFile(templatePath, data)) as string;
       return html;
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao renderizar template de email:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao renderizar template',

@@ -30,18 +30,18 @@ export class EmployeesController {
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Post()
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  Create(@Body() body: CreateEmployeeDTO) {
-    return this.employeesService.Create(body);
+  create(@Body() body: CreateEmployeeDTO) {
+    return this.employeesService.create(body);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Patch('update/self/:id')
-  UpdateSelf(
+  updateSelf(
     @Param('id') id: UrlUuidDTO,
     @Body() updateEmployeeDTO: UpdateEmployeeDTO,
     @TokenPayloadParam() TokenPayloadDTO: TokenPayloadDTO,
   ) {
-    return this.employeesService.UpdateSelf(
+    return this.employeesService.updateSelf(
       id,
       updateEmployeeDTO,
       TokenPayloadDTO,
@@ -51,12 +51,12 @@ export class EmployeesController {
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Patch('update/admin/:id')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  UpdateAdmin(
+  updateAdmin(
     @Param('id') id: UrlUuidDTO,
     @Body() updateEmployeeAdminDTO: UpdateEmployeeAdminDTO,
     @TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    return this.employeesService.UpdateAdmin(
+    return this.employeesService.updateAdmin(
       id,
       updateEmployeeAdminDTO,
       tokenPayloadDTO,
@@ -66,21 +66,21 @@ export class EmployeesController {
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('search/email/:email')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  FindByEmail(@Param('email') email: string) {
-    return this.employeesService.FindByEmail(email);
+  findByEmail(@Param('email') email: string) {
+    return this.employeesService.findByEmail(email);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('search/name/')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  FindByName(@Query() paginationByNameDto: PaginationByNameDTO) {
-    return this.employeesService.FindByName(paginationByNameDto);
+  findByName(@Query() paginationByNameDto: PaginationByNameDTO) {
+    return this.employeesService.findByName(paginationByNameDto);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('search/role/')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  FindByRole(@Query() paginationByRoleDto: PaginationByRoleDTO) {
-    return this.employeesService.FindByRole(paginationByRoleDto);
+  findByRole(@Query() paginationByRoleDto: PaginationByRoleDTO) {
+    return this.employeesService.findByRole(paginationByRoleDto);
   }
 }

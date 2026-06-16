@@ -28,17 +28,17 @@ export class UsersController {
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @UsePipes(IsNotEmptyPayloadPipe)
   @Patch()
-  Update(
+  update(
     @Body() updateUserDTO: UpdateUserDTO,
     @TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    return this.usersService.Update(tokenPayloadDTO, updateUserDTO);
+    return this.usersService.update(tokenPayloadDTO, updateUserDTO);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('me')
-  FindMe(@TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO) {
-    return this.usersService.FindByIdMe(tokenPayloadDTO);
+  findMe(@TokenPayloadParam() tokenPayloadDTO: TokenPayloadDTO) {
+    return this.usersService.findByIdMe(tokenPayloadDTO);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
@@ -46,8 +46,8 @@ export class UsersController {
   @UseGuards(RoutePolicyGuard)
   @Get('search/email/:email')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  FindByEmail(@Param('email') email: SearchByEmailDTO) {
-    return this.usersService.FindByEmail(email);
+  findByEmail(@Param('email') email: SearchByEmailDTO) {
+    return this.usersService.findByEmail(email);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
@@ -55,7 +55,7 @@ export class UsersController {
   @UseGuards(RoutePolicyGuard)
   @Get('search/name/')
   @SetRoutePolicy(EmployeeRole.ADMIN)
-  FindByName(@Query() paginationByNameDto: PaginationByNameDTO) {
-    return this.usersService.FindByName(paginationByNameDto);
+  findByName(@Query() paginationByNameDto: PaginationByNameDTO) {
+    return this.usersService.findByName(paginationByNameDto);
   }
 }

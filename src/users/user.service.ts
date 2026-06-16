@@ -30,7 +30,7 @@ export class UsersService {
     private dataSource: DataSource,
   ) {}
 
-  async Create(createUserDTO: CreateUserDTO) {
+  async create(createUserDTO: CreateUserDTO) {
     const doesUserAlreadyExists = await this.usersRepository.findOne({
       where: {
         email: createUserDTO.email,
@@ -44,7 +44,7 @@ export class UsersService {
     let password_hash: string | null = null;
 
     if (createUserDTO?.password) {
-      password_hash = await this.hashingService.Hash(createUserDTO.password);
+      password_hash = await this.hashingService.hash(createUserDTO.password);
     }
 
     const userData = {
@@ -66,7 +66,7 @@ export class UsersService {
     };
   }
 
-  async Update(tokenPayloadDTO: TokenPayloadDTO, updateUserDTO: UpdateUserDTO) {
+  async update(tokenPayloadDTO: TokenPayloadDTO, updateUserDTO: UpdateUserDTO) {
     const allowedData = {
       email: updateUserDTO.email,
       name: updateUserDTO.name,
@@ -94,7 +94,7 @@ export class UsersService {
         throw new BadRequestException('Senha antiga não enviada');
       }
 
-      const updateEmailOrPassword = await this.VerifyToUpdateEmailOrPassword(
+      const updateEmailOrPassword = await this.verifyToUpdateEmailOrPassword(
         findUserById,
         updateUserDTO.currentPassword,
         updateUserDTO.email,
@@ -133,13 +133,13 @@ export class UsersService {
     };
   }
 
-  private async VerifyToUpdateEmailOrPassword(
+  private async verifyToUpdateEmailOrPassword(
     user: User,
     currentPassword: string,
     newEmail?: string,
     newPassword?: string,
   ) {
-    const passwordCompare = await this.hashingService.Compare(
+    const passwordCompare = await this.hashingService.compare(
       currentPassword,
       user.password_hash,
     );
@@ -156,7 +156,7 @@ export class UsersService {
     if (newEmail) newData.email = newEmail;
 
     if (newPassword) {
-      const passwordHash = await this.hashingService.Hash(newPassword);
+      const passwordHash = await this.hashingService.hash(newPassword);
 
       if (!passwordHash) {
         throw new InternalServerErrorException('Erro ao atualizar senha');
@@ -168,7 +168,7 @@ export class UsersService {
     return newData;
   }
 
-  async FindByEmail(emailDTO: SearchByEmailDTO) {
+  async findByEmail(emailDTO: SearchByEmailDTO) {
     const email = emailDTO.email;
 
     const userFindByEmail = await this.usersRepository.findOneBy({
@@ -182,7 +182,7 @@ export class UsersService {
     return userFindByEmail;
   }
 
-  async FindById(id: string) {
+  async findById(id: string) {
     const userFindById = await this.usersRepository.findOneBy({
       id,
     });
@@ -194,7 +194,7 @@ export class UsersService {
     return userFindById;
   }
 
-  async FindByIdMe(tokenPayloadDTO: TokenPayloadDTO) {
+  async findByIdMe(tokenPayloadDTO: TokenPayloadDTO) {
     const userFindById = await this.usersRepository.findOneBy({
       id: tokenPayloadDTO.sub,
     });
@@ -206,7 +206,7 @@ export class UsersService {
     return userFindById;
   }
 
-  async FindByEmailForGoogle(email: string) {
+  async findByEmailForGoogle(email: string) {
     const employeeFindByEmail = await this.usersRepository.findOneBy({
       email,
     });
@@ -214,7 +214,7 @@ export class UsersService {
     return employeeFindByEmail;
   }
 
-  async FindByName(paginationByNameDTO: PaginationByNameDTO) {
+  async findByName(paginationByNameDTO: PaginationByNameDTO) {
     const { limit, offset, value } = paginationByNameDTO;
 
     const [userFindByName, total] = await this.usersRepository.findAndCount({

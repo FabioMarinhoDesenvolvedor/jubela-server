@@ -23,7 +23,7 @@ import {
 } from 'typeorm';
 
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { CreateOrderItemDTO } from './dto/create-item.dto';
 import { PaginationAllOrdersDTO } from './dto/pagination-all-orders.dto';
 import { PaginationByPriceDTO } from './dto/pagination-by-price.dto';
@@ -45,7 +45,7 @@ export class OrdersService {
     private dataSource: DataSource,
   ) {}
 
-  async Create(
+  async create(
     createOrderItemDTO: CreateOrderItemDTO[],
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
@@ -70,7 +70,7 @@ export class OrdersService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      const getTotalPrice = await this.PriceCalculate(
+      const getTotalPrice = await this.priceCalculate(
         createOrderItemDTO,
         queryRunner,
       );
@@ -154,10 +154,10 @@ export class OrdersService {
 
       await queryRunner.commitTransaction();
 
-      if (sendEmail === true) await this.emailService.LowStockWarn(findProduct);
+      if (sendEmail === true) await this.emailService.lowStockWarn(findProduct);
 
       const createPreferenceObject =
-        this.ReturnItemsIPObject(itemsFromThisOrder);
+        this.returnItemsIPObject(itemsFromThisOrder);
 
       return {
         orderId: newOrderData.id,
@@ -170,7 +170,7 @@ export class OrdersService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao criar pedido e atualizar dados do produto',
         queryFailedError: 'Erro nas transações de dados do pedido',
         internalServerError: 'Erro ao processar o pedido',
@@ -182,7 +182,7 @@ export class OrdersService {
     }
   }
 
-  async PriceCalculate(
+  async priceCalculate(
     createOrderItemDTO: CreateOrderItemDTO[],
     queryRunner: QueryRunner,
   ) {
@@ -218,7 +218,7 @@ export class OrdersService {
     return totalPriceCents;
   }
 
-  ReturnItemsIPObject(items: Items[]) {
+  returnItemsIPObject(items: Items[]) {
     const itemsList = [];
     for (const item of items) {
       itemsList.push({
@@ -231,7 +231,7 @@ export class OrdersService {
     return itemsList;
   }
 
-  async FindById(id: string) {
+  async findById(id: string) {
     const orderFindById = await this.ordersRepository.findOne({
       where: {
         id,
@@ -249,7 +249,7 @@ export class OrdersService {
     return orderFindById;
   }
 
-  async ListOrdersEmployees(paginationAllOrders?: PaginationAllOrdersDTO) {
+  async listOrdersEmployees(paginationAllOrders?: PaginationAllOrdersDTO) {
     const { limit, offset } = paginationAllOrders;
 
     const [findAll, total] = await this.ordersRepository.findAndCount({
@@ -263,8 +263,8 @@ export class OrdersService {
     return [total, ...findAll];
   }
 
-  async ListOrdersUsers(tokenPayloadDTO: TokenPayloadDTO) {
-    const user = await this.RequireUser(tokenPayloadDTO.sub);
+  async listOrdersUsers(tokenPayloadDTO: TokenPayloadDTO) {
+    const user = await this.requireUser(tokenPayloadDTO.sub);
 
     const [findAll, total] = await this.ordersRepository.findAndCount({
       where: { user },
@@ -274,10 +274,10 @@ export class OrdersService {
     return [total, ...findAll];
   }
 
-  async FindByPriceEmployees(paginationByPriceDTO: PaginationByPriceDTO) {
+  async findByPriceEmployees(paginationByPriceDTO: PaginationByPriceDTO) {
     const { limit, offset, value } = paginationByPriceDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -285,14 +285,14 @@ export class OrdersService {
     });
   }
 
-  async FindByPriceUsers(
+  async findByPriceUsers(
     paginationByPriceDTO: PaginationByPriceDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const user = await this.RequireUser(tokenPayloadDTO.sub);
+    const user = await this.requireUser(tokenPayloadDTO.sub);
     const { limit, offset, value } = paginationByPriceDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -300,10 +300,10 @@ export class OrdersService {
     });
   }
 
-  async FindByItemEmployees(paginationDTO: PaginationDTO) {
+  async findByItemEmployees(paginationDTO: PaginationDTO) {
     const { limit, offset, value } = paginationDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -311,14 +311,14 @@ export class OrdersService {
     });
   }
 
-  async FindByItemUsers(
+  async findByItemUsers(
     paginationDTO: PaginationDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const user = await this.RequireUser(tokenPayloadDTO.sub);
+    const user = await this.requireUser(tokenPayloadDTO.sub);
     const { limit, offset, value } = paginationDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -326,10 +326,10 @@ export class OrdersService {
     });
   }
 
-  async FindByStatus(paginationByStatusDTO: PaginationByStatusDTO) {
+  async findByStatus(paginationByStatusDTO: PaginationByStatusDTO) {
     const { limit, offset, value } = paginationByStatusDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -337,10 +337,10 @@ export class OrdersService {
     });
   }
 
-  async FindByUser(paginationByUserDTO: PaginationByUserDTO) {
+  async findByUser(paginationByUserDTO: PaginationByUserDTO) {
     const { limit, offset, value } = paginationByUserDTO;
 
-    return this.SearchOrders({
+    return this.searchOrders({
       take: limit,
       skip: offset,
       order: { id: 'desc' },
@@ -350,8 +350,8 @@ export class OrdersService {
     });
   }
 
-  private async RequireUser(sub: string) {
-    const user = await this.usersService.FindById(sub);
+  private async requireUser(sub: string) {
+    const user = await this.usersService.findById(sub);
 
     if (!user) {
       throw new UnauthorizedException('Ação não permitida');
@@ -360,7 +360,7 @@ export class OrdersService {
     return user;
   }
 
-  private async SearchOrders(options: FindManyOptions<Order>) {
+  private async searchOrders(options: FindManyOptions<Order>) {
     const [orders, total] = await this.ordersRepository.findAndCount(options);
 
     if (orders.length < 1) {

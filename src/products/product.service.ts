@@ -14,8 +14,8 @@ import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { EmailService } from 'src/email/email.service';
 import { EmployeesService } from 'src/employees/employee.service';
 import { Employee } from 'src/employees/entities/employee.entity';
-import { GetErrorMessage } from 'src/utils/error-message.util';
-import { ErrorManagement } from 'src/utils/error.util';
+import { getErrorMessage } from 'src/utils/error-message.util';
+import { errorManagement } from 'src/utils/error.util';
 import { DataSource, Like, QueryRunner, Repository } from 'typeorm';
 import { CreateProductDTO } from './dto/create-product.dto';
 import { PaginationByEmployeeDTO } from './dto/pagination-by-employee.dto';
@@ -41,14 +41,14 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
-  async Create(
+  async create(
     createProductDTO: CreateProductDTO,
     files: Array<Express.Multer.File>,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
     const { sub } = tokenPayloadDTO;
 
-    const findEmployee = await this.employeesService.FindById(sub);
+    const findEmployee = await this.employeesService.findById(sub);
 
     if (!findEmployee) {
       throw new NotFoundException('Funcionário não encontrado');
@@ -57,12 +57,12 @@ export class ProductsService {
     let uploadResults: UploadApiResponse[];
 
     try {
-      uploadResults = await this.cloudinaryService.UploadMultipleImages(
+      uploadResults = await this.cloudinaryService.uploadMultipleImages(
         files,
         'products',
       );
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload das imagens:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao realizar upload de imagens',
@@ -130,12 +130,12 @@ export class ProductsService {
 
       try {
         const publicIds = uploadResults.map((results) => results.public_id);
-        await this.cloudinaryService.DeleteMultipleImages(publicIds);
+        await this.cloudinaryService.deleteMultipleImages(publicIds);
       } catch (cleanupError) {
         this.logger.error('Erro ao fazer cleanup das imagens:', cleanupError);
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao cadastrar produto:',
         queryFailedError: 'Erro ao registrar produto',
         internalServerError: 'Erro interno cadastrar produto',
@@ -146,7 +146,7 @@ export class ProductsService {
     }
   }
 
-  async Update(
+  async update(
     id: string,
     imageId: string,
     updateProductDTO: UpdateProductDTO,
@@ -170,11 +170,11 @@ export class ProductsService {
       }
 
       if (file) {
-        await this.ReplaceImage(findProduct, imageId, file, queryRunner);
+        await this.replaceImage(findProduct, imageId, file, queryRunner);
         updatesPerformed.push('image');
       }
 
-      await this.UpdateRegularData(findProduct, updateProductDTO, queryRunner);
+      await this.updateRegularData(findProduct, updateProductDTO, queryRunner);
 
       for (let i = 0; i < Object.keys(updateProductDTO).length; i++) {
         updatesPerformed.push(Object.keys(updateProductDTO));
@@ -195,7 +195,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao atualizar produto:',
         queryFailedError: 'Erro ao atualizar dados de produto',
         internalServerError: 'Erro interno ao atualizar produto',
@@ -206,7 +206,7 @@ export class ProductsService {
     }
   }
 
-  async UpdatePrice(
+  async updatePrice(
     id: string,
     updateProductPriceDataDTO: UpdatePriceProductDTO,
   ) {
@@ -236,7 +236,7 @@ export class ProductsService {
     return updatedProduct;
   }
 
-  private async UpdateRegularData(
+  private async updateRegularData(
     product: Product,
     updateProductRegularDataDTO: UpdateProductDTO,
     queryRunnerSub: QueryRunner,
@@ -263,7 +263,7 @@ export class ProductsService {
    * Substitui uma imagem específica por outra
    * Mantém a ordem e se é principal ou não
    */
-  private async ReplaceImage(
+  private async replaceImage(
     product: Product,
     imageId: string,
     file: Express.Multer.File,
@@ -280,13 +280,13 @@ export class ProductsService {
     // Upload da nova imagem antes da transação
     let uploadResult: UploadApiResponse;
     try {
-      const results = await this.cloudinaryService.UploadMultipleImages(
+      const results = await this.cloudinaryService.uploadMultipleImages(
         [file],
         'products',
       );
       uploadResult = results[0];
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload da imagem:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao fazer upload de imagem',
@@ -301,18 +301,18 @@ export class ProductsService {
     await queryRunnerSub.manager.save(ProductImages, imageToReplace);
 
     try {
-      await this.cloudinaryService.DeleteMultipleImages([oldPublicId]);
+      await this.cloudinaryService.deleteMultipleImages([oldPublicId]);
     } catch (error) {
       // Reverte a nova imagem no Cloudinary para não deixar órfã
       try {
-        await this.cloudinaryService.DeleteMultipleImages([
+        await this.cloudinaryService.deleteMultipleImages([
           uploadResult.public_id,
         ]);
       } catch (cleanupError) {
         this.logger.error('Erro no cleanup:', cleanupError);
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao deletar imagem antiga do Cloudinary:',
         queryFailedError: 'Erro ao atualizar registro de imagem',
         internalServerError: 'Erro interno ao atualizar imagem',
@@ -324,7 +324,7 @@ export class ProductsService {
   /**
    * Adiciona novas imagens a um produto existente
    */
-  async AddImages(productId: string, files: Express.Multer.File[]) {
+  async addImages(productId: string, files: Express.Multer.File[]) {
     const product = await this.productsRepository.findOne({
       where: { id: productId },
       relations: {
@@ -345,12 +345,12 @@ export class ProductsService {
 
     let uploadResults: UploadApiResponse[];
     try {
-      uploadResults = await this.cloudinaryService.UploadMultipleImages(
+      uploadResults = await this.cloudinaryService.uploadMultipleImages(
         files,
         'products',
       );
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload das imagens:',
         queryFailedError: '',
         internalServerError:
@@ -404,12 +404,12 @@ export class ProductsService {
 
       const publicIds = uploadResults.map((r) => r.public_id);
       try {
-        await this.cloudinaryService.DeleteMultipleImages(publicIds);
+        await this.cloudinaryService.deleteMultipleImages(publicIds);
       } catch (cleanupError) {
         this.logger.error('Erro no cleanup:', cleanupError);
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao adicionar imagens no banco de dados:',
         queryFailedError: 'Erro ao adicionar registros de imagens',
         internalServerError: 'Erro interno ao registrar imagens do produto',
@@ -420,7 +420,7 @@ export class ProductsService {
     }
   }
 
-  async RemoveImage(productId: string, imageId: string) {
+  async removeImage(productId: string, imageId: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -467,10 +467,10 @@ export class ProductsService {
       await queryRunner.commitTransaction();
 
       try {
-        await this.cloudinaryService.DeleteMultipleImages([publicIdToDelete]);
+        await this.cloudinaryService.deleteMultipleImages([publicIdToDelete]);
       } catch (cloudinaryError) {
         // Banco já commitado: imagem fica órfã no Cloudinary, apenas loga
-        const errorMessage = GetErrorMessage(cloudinaryError);
+        const errorMessage = getErrorMessage(cloudinaryError);
 
         this.logger.error(
           `Imagem deletada do banco mas falhou no Cloudinary:`,
@@ -492,7 +492,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao apagar imagens:',
         queryFailedError: 'Erro ao apagar registro de imagem',
         internalServerError: 'Erro interno ao remover imagem',
@@ -504,7 +504,7 @@ export class ProductsService {
     }
   }
 
-  async Delete(id: string) {
+  async delete(id: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -528,7 +528,7 @@ export class ProductsService {
       await queryRunner.commitTransaction();
 
       if (publicIdsToDelete.length > 0) {
-        await this.DeleteFromCloudinaryAsync(publicIdsToDelete).catch(
+        await this.deleteFromCloudinaryAsync(publicIdsToDelete).catch(
           (error) => {
             this.logger.error('Erro ao deletar do Cloudinary:', error);
           },
@@ -539,7 +539,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao excluir produto:',
         queryFailedError: 'Erro ao apagar registro de produto',
         internalServerError: 'Erro interno ao deletar produto',
@@ -550,11 +550,11 @@ export class ProductsService {
     }
   }
 
-  private async DeleteFromCloudinaryAsync(publicIds: string[]): Promise<void> {
+  private async deleteFromCloudinaryAsync(publicIds: string[]): Promise<void> {
     try {
-      await this.cloudinaryService.DeleteMultipleImages(publicIds);
+      await this.cloudinaryService.deleteMultipleImages(publicIds);
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro do cloudinary - múltiplas imagens',
         queryFailedError: '',
         internalServerError: 'Erro interno ao deletar múltiplas imagens',
@@ -563,7 +563,7 @@ export class ProductsService {
     }
   }
 
-  async FindById(id: string) {
+  async findById(id: string) {
     const productFindById = await this.productsRepository.findOneBy({
       id,
     });
@@ -575,7 +575,7 @@ export class ProductsService {
     return productFindById;
   }
 
-  async ListProducts() {
+  async listProducts() {
     const items = await this.productsRepository.find({
       order: {
         id: 'desc',
@@ -587,7 +587,7 @@ export class ProductsService {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async StockCheck(productId: string, orderQuantity: number, orderId?: string) {
+  async stockCheck(productId: string, orderQuantity: number, orderId?: string) {
     const findProduct = await this.productsRepository.findOneBy({
       id: productId,
     });
@@ -604,12 +604,12 @@ export class ProductsService {
         );
 
       case quantity <= lowStock && quantity >= orderQuantity:
-        await this.emailService.LowStockWarn(findProduct);
+        await this.emailService.lowStockWarn(findProduct);
         return;
     }
   }
 
-  async FindByName(name: string) {
+  async findByName(name: string) {
     const productFindByName = await this.productsRepository.find({
       order: {
         id: 'desc',
@@ -632,7 +632,7 @@ export class ProductsService {
     return productFindByName;
   }
 
-  async FindByCategory(category: string) {
+  async findByCategory(category: string) {
     const productFindByCategory = await this.productsRepository.find({
       order: {
         id: 'desc',
@@ -655,7 +655,7 @@ export class ProductsService {
     return productFindByCategory;
   }
 
-  async FindBySku(sku: string) {
+  async findBySku(sku: string) {
     const productFindBySku = await this.productsRepository.findOneBy({
       sku,
     });
@@ -667,7 +667,7 @@ export class ProductsService {
     return productFindBySku;
   }
 
-  async FindByEmployee(paginationByEmployeeDTO: PaginationByEmployeeDTO) {
+  async findByEmployee(paginationByEmployeeDTO: PaginationByEmployeeDTO) {
     const { limit, offset, value } = paginationByEmployeeDTO;
 
     const [productFindByEmployee, total] =

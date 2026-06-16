@@ -57,7 +57,7 @@ export class ProductsController {
       },
     }),
   )
-  Create(
+  create(
     @UploadedFiles(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({ fileType: /jpeg|jpg|png/g })
@@ -77,7 +77,7 @@ export class ProductsController {
       throw new BadRequestException('Pelo menos uma imagem é obrigatória');
     }
 
-    return this.productsService.Create(body, files, tokenPayloadDTO);
+    return this.productsService.create(body, files, tokenPayloadDTO);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
@@ -100,7 +100,7 @@ export class ProductsController {
       },
     }),
   )
-  AddImages(
+  addImages(
     @Param('id') id: string,
     @UploadedFiles(
       new ParseFilePipeBuilder()
@@ -116,7 +116,7 @@ export class ProductsController {
       throw new BadRequestException('Pelo menos uma imagem é obrigatória');
     }
 
-    return this.productsService.AddImages(id, files);
+    return this.productsService.addImages(id, files);
   }
 
   // IMPORTANTE: precisa ser declarada ANTES de 'update/:id/:imageId?',
@@ -124,8 +124,8 @@ export class ProductsController {
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Patch('update/price/:id')
   @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
-  UpdatePrices(@Param('id') id: string, @Body() body: UpdatePriceProductDTO) {
-    return this.productsService.UpdatePrice(id, body);
+  updatePrices(@Param('id') id: string, @Body() body: UpdatePriceProductDTO) {
+    return this.productsService.updatePrice(id, body);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
@@ -148,7 +148,7 @@ export class ProductsController {
       },
     }),
   )
-  Update(
+  update(
     @Param('id') id: string,
     @Body() body: UpdateProductDTO,
     @UploadedFile(
@@ -162,28 +162,28 @@ export class ProductsController {
     file?: Express.Multer.File,
     @Param('imageId') imageId?: string,
   ) {
-    return this.productsService.Update(id, imageId, body, file);
+    return this.productsService.update(id, imageId, body, file);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Delete('delete/images')
   @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
-  DeleteImages(@Body() body: DeleteImagesDTO) {
-    return this.productsService.RemoveImage(body.productId, body.imageId);
+  deleteImages(@Body() body: DeleteImagesDTO) {
+    return this.productsService.removeImage(body.productId, body.imageId);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Delete(':id')
   @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
-  Delete(@Param('id') id: string) {
-    return this.productsService.Delete(id);
+  delete(@Param('id') id: string) {
+    return this.productsService.delete(id);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get()
-  async ListProducts() {
-    const allProducts = await this.productsService.ListProducts();
+  async listProducts() {
+    const allProducts = await this.productsService.listProducts();
 
     if (allProducts.length < 1) {
       return {
@@ -198,28 +198,28 @@ export class ProductsController {
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('search/sku/:sku')
   @SetRoutePolicy(EmployeeRole.READ_PRODUCTS)
-  FindBySku(@Param('sku') sku: string) {
-    return this.productsService.FindBySku(sku);
+  findBySku(@Param('sku') sku: string) {
+    return this.productsService.findBySku(sku);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/name/:name')
-  FindByName(@Param('name') name: string) {
-    return this.productsService.FindByName(name);
+  findByName(@Param('name') name: string) {
+    return this.productsService.findByName(name);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/category/:category')
-  FindByRole(@Param('category') category: string) {
-    return this.productsService.FindByCategory(category);
+  findByRole(@Param('category') category: string) {
+    return this.productsService.findByCategory(category);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Get('search/employee/')
   @SetRoutePolicy(EmployeeRole.READ_PRODUCTS)
-  FindByEmployee(@Query() paginationByEmployeeDto: PaginationByEmployeeDTO) {
-    return this.productsService.FindByEmployee(paginationByEmployeeDto);
+  findByEmployee(@Query() paginationByEmployeeDto: PaginationByEmployeeDTO) {
+    return this.productsService.findByEmployee(paginationByEmployeeDto);
   }
 }

@@ -13,14 +13,14 @@ export class RefreshTokensController {
   constructor(private readonly refreshTokensService: RefreshTokensService) {}
 
   @Post('user')
-  async RefreshTokensUser(
+  async refreshTokensUser(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const token = (req as any).refreshToken;
 
     const getRefreshToken =
-      await this.refreshTokensService.RefreshTokensUser(token);
+      await this.refreshTokensService.refreshTokensUser(token);
 
     res.cookie('accessToken', getRefreshToken.accessToken, {
       httpOnly: true,
@@ -42,13 +42,13 @@ export class RefreshTokensController {
   }
 
   @Post('employee')
-  async RefreshTokensEmployee(
+  async refreshTokensEmployee(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const token = (req as any).refreshToken;
     const getRefreshToken =
-      await this.refreshTokensService.RefreshTokensEmployee(token);
+      await this.refreshTokensService.refreshTokensEmployee(token);
 
     res.cookie('accessToken', getRefreshToken.accessToken, {
       httpOnly: true,

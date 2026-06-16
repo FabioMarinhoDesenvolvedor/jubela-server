@@ -13,7 +13,7 @@ export class LogsService {
     private readonly logUserRepository: Repository<LogUser>,
   ) {}
 
-  async CreateLogEmployee(
+  async createLogEmployee(
     createLogEmployeeDTO: CreateLogEmployee,
     queryRunnerSub: QueryRunner,
   ) {
@@ -27,7 +27,7 @@ export class LogsService {
     return 'Log criado com sucesso';
   }
 
-  async CreateLogUser(
+  async createLogUser(
     createLogUserDTO: CreateLogUser,
     queryRunnerSub: QueryRunner,
   ) {
