@@ -19,8 +19,6 @@ import { ErrorManagement } from 'src/utils/error.util';
 import { DataSource, Like, QueryRunner, Repository } from 'typeorm';
 import { CreateProductDTO } from './dto/create-product.dto';
 import { PaginationByEmployeeDTO } from './dto/pagination-by-employee.dto';
-import { ProductFindByCategoryDTO } from './dto/product-find-by-category.dto';
-import { ProductFindByNameDTO } from './dto/product-find-by-name.dto';
 import { UpdatePriceProductDTO } from './dto/update-product-price.dto';
 import { UpdateProductDTO } from './dto/update-product.dto';
 import { ProductImages } from './entities/product-images.entity';
@@ -642,13 +640,13 @@ export class ProductsService {
     }
   }
 
-  async FindByName(nameParam: ProductFindByNameDTO) {
+  async FindByName(name: string) {
     const productFindByName = await this.productsRepository.find({
       order: {
         id: 'desc',
       },
       where: {
-        name: Like(`${nameParam.name}%`),
+        name: Like(`${name}%`),
       },
     });
 
@@ -665,27 +663,27 @@ export class ProductsService {
     return productFindByName;
   }
 
-  async FindByCategory(categoryParam: ProductFindByCategoryDTO) {
-    const productFindByName = await this.productsRepository.find({
+  async FindByCategory(category: string) {
+    const productFindByCategory = await this.productsRepository.find({
       order: {
         id: 'desc',
       },
       where: {
-        name: Like(`${categoryParam.category}%`),
+        category: Like(`${category}%`),
       },
     });
 
-    if (!productFindByName) {
+    if (!productFindByCategory) {
       throw new InternalServerErrorException(
         'Erro desconhecido ao tentar pesquisar por produtos',
       );
     }
 
-    if (productFindByName.length < 1) {
+    if (productFindByCategory.length < 1) {
       throw new NotFoundException('Produtos não encontrados');
     }
 
-    return productFindByName;
+    return productFindByCategory;
   }
 
   async FindBySku(sku: string) {

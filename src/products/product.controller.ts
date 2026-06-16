@@ -28,8 +28,6 @@ import { EmployeeRole } from 'src/common/enums/employee-role.enum';
 import { CreateProductDTO } from './dto/create-product.dto';
 import { DeleteImagesDTO } from './dto/delete-images.dto';
 import { PaginationByEmployeeDTO } from './dto/pagination-by-employee.dto';
-import { ProductFindByCategoryDTO } from './dto/product-find-by-category.dto';
-import { ProductFindByNameDTO } from './dto/product-find-by-name.dto';
 import { UpdatePriceProductDTO } from './dto/update-product-price.dto';
 import { UpdateProductDTO } from './dto/update-product.dto';
 import { ProductsService } from './product.service';
@@ -121,6 +119,15 @@ export class ProductsController {
     return this.productsService.AddImages(id, files);
   }
 
+  // IMPORTANTE: precisa ser declarada ANTES de 'update/:id/:imageId?',
+  // senão o Express casa 'update/price' com a rota curinga (id = "price").
+  @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
+  @Patch('update/price/:id')
+  @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
+  UpdatePrices(@Param('id') id: string, @Body() body: UpdatePriceProductDTO) {
+    return this.productsService.UpdatePrice(id, body);
+  }
+
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
   @Patch('update/:id/:imageId?')
   @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
@@ -156,13 +163,6 @@ export class ProductsController {
     @Param('imageId') imageId?: string,
   ) {
     return this.productsService.Update(id, imageId, body, file);
-  }
-
-  @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
-  @Patch('update/price')
-  @SetRoutePolicy(EmployeeRole.EDIT_PRODUCTS)
-  UpdatePrices(@Param('id') id: string, @Body() body: UpdatePriceProductDTO) {
-    return this.productsService.UpdatePrice(id, body);
   }
 
   @SkipThrottle({ read: true, auth: true, refresh: true, preference: true })
@@ -205,14 +205,14 @@ export class ProductsController {
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/name/:name')
-  FindByName(@Param('name') name: ProductFindByNameDTO) {
+  FindByName(@Param('name') name: string) {
     return this.productsService.FindByName(name);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/category/:category')
-  FindByRole(@Param('category') category: ProductFindByCategoryDTO) {
+  FindByRole(@Param('category') category: string) {
     return this.productsService.FindByCategory(category);
   }
 
