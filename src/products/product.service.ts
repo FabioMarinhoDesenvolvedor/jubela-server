@@ -120,7 +120,7 @@ export class ProductsService {
         },
       });
 
-      if (!createProduct) {
+      if (!createdProduct) {
         throw new NotFoundException('Produto não encontrado');
       }
 
@@ -176,8 +176,9 @@ export class ProductsService {
 
       await this.updateRegularData(findProduct, updateProductDTO, queryRunner);
 
-      for (let i = 0; i < Object.keys(updateProductDTO).length; i++) {
-        updatesPerformed.push(Object.keys(updateProductDTO));
+      const updatedFields = Object.keys(updateProductDTO);
+      if (updatedFields.length > 0) {
+        updatesPerformed.push(...updatedFields);
       }
 
       await queryRunner.commitTransaction();
@@ -586,11 +587,14 @@ export class ProductsService {
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async stockCheck(productId: string, orderQuantity: number, orderId?: string) {
+  async stockCheck(productId: string, orderQuantity: number) {
     const findProduct = await this.productsRepository.findOneBy({
       id: productId,
     });
+
+    if (!findProduct) {
+      throw new NotFoundException('Produto não encontrado');
+    }
 
     const { quantity, lowStock } = findProduct;
 
