@@ -17,7 +17,6 @@ import { UsersService } from 'src/users/user.service';
 import { DataSource, In, QueryRunner, Repository } from 'typeorm';
 
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
-import { PaymentStatus } from 'src/common/enums/payment-status.enum';
 import { ErrorManagement } from 'src/utils/error.util';
 import { CreateOrderItemDTO } from './dto/create-item.dto';
 import { PaginationAllOrdersDTO } from './dto/pagination-all-orders.dto';
@@ -27,7 +26,6 @@ import { PaginationByStatusDTO } from './dto/pagination-order-status.dto';
 import { PaginationDTO } from './dto/pagination-order.dto';
 import { Items } from './entities/items.entity';
 import { Order } from './entities/order.entity';
-import { PaymentConfirmation } from './entities/payment-confirmation.entity';
 
 @Injectable()
 export class OrdersService {
@@ -225,86 +223,6 @@ export class OrdersService {
     }
 
     return itemsList;
-  }
-
-  async StockRelease(order: Order) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      for (const item of order.items) {
-        const findProduct = await queryRunner.manager.findOne(Product, {
-          where: {
-            id: item.product.id,
-          },
-          lock: { mode: 'pessimistic_write' },
-          loadEagerRelations: false,
-        });
-
-        if (!findProduct) {
-          throw new NotFoundException(
-            `Produto ${item.product_name} não encontrado para ser devolvido ao estoque`,
-          );
-        }
-
-        const returnedQuantity = await queryRunner.manager.increment(
-          Product,
-          { id: findProduct.id },
-          'quantity',
-          item.quantity,
-        );
-
-        if (!returnedQuantity || returnedQuantity.affected < 1) {
-          throw new InternalServerErrorException(
-            `Erro ao tentar devolver unidades de produto ${item.product_name} ao estoque`,
-          );
-        }
-      }
-
-      const orderUpdate = await queryRunner.manager.update(Order, order.id, {
-        status: OrderStatus.CANCELED,
-        cancelReason: 'Expirado (1 hora sem pagamento)',
-        canceledAt: new Date(),
-      });
-
-      if (!orderUpdate || orderUpdate.affected === 0) {
-        throw new InternalServerErrorException('Erro ao atualizar pedido');
-      }
-
-      const paymentConfirmationUpdate = await queryRunner.manager.update(
-        PaymentConfirmation,
-        order.paymentConfirmation.id,
-        {
-          paymentStatus: PaymentStatus.FAILED,
-          errorMessage: 'Expirado (1 hora sem pagamento)',
-        },
-      );
-
-      if (
-        !paymentConfirmationUpdate ||
-        paymentConfirmationUpdate.affected === 0
-      ) {
-        throw new InternalServerErrorException(
-          'Erro ao atualizar dados de confirmação de pagamento',
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      return this.logger.log(`✅ Pedido ${order.id} expirado e liberado`);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
-        logger: `❌ Erro no cancelamento do pedido ${order.id}`,
-        queryFailedError: 'Erro na atualização dos dados do pedido cancelado',
-        internalServerError: 'Erro interno no cancelamento do pedido',
-        generalError: `Falha ao processar transação no cancelamento do pedido ${order.id}`,
-      });
-    } finally {
-      await queryRunner.release();
-    }
   }
 
   async FindById(id: string) {
