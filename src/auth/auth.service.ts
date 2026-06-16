@@ -192,8 +192,6 @@ export class AuthService {
         },
       );
 
-      this.logger.log(findResetPassAttemptRegister);
-
       if (!findResetPassAttemptRegister) {
         throw new BadRequestException('Token inválido ou expirado');
       }
@@ -417,13 +415,6 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      errorManagement(error, GeneralErrorType.INTERNAL, {
-        logger: 'Erro ao criar novo par de tokens',
-        queryFailedError: 'Erro nos registros de autenticação',
-        internalServerError: 'Erro interno ao criar novo par de tokens',
-        generalError: 'Falha ao processar transação da autenticação',
-      });
-
       try {
         await this.emailsService.logIssue('usuário');
       } catch (emailErr) {
@@ -432,6 +423,13 @@ export class AuthService {
           emailErr,
         );
       }
+
+      errorManagement(error, GeneralErrorType.INTERNAL, {
+        logger: 'Erro ao criar novo par de tokens',
+        queryFailedError: 'Erro nos registros de autenticação',
+        internalServerError: 'Erro interno ao criar novo par de tokens',
+        generalError: 'Falha ao processar transação da autenticação',
+      });
     } finally {
       await queryRunner.release();
     }
