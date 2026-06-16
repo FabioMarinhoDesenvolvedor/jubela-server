@@ -277,7 +277,7 @@ export class AuthService {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
-    return 'Logout criado com suceso';
+    return 'Logout criado com sucesso';
   }
 
   async LogoutUser(logoutDto: LogoutDTO) {
@@ -302,7 +302,7 @@ export class AuthService {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
-    return 'Logout criado com suceso';
+    return 'Logout criado com sucesso';
   }
 
   async CreateTokensEmployee(employeeData: Employee) {

@@ -259,7 +259,7 @@ export class RefreshTokensService {
     let refreshToken: string = '';
 
     try {
-      const doesEmployeeReallyExists = await queryRunner.manager.findOne(
+      const employee = await queryRunner.manager.findOne(
         Employee,
         {
           where: {
@@ -268,7 +268,7 @@ export class RefreshTokensService {
         },
       );
 
-      if (!doesEmployeeReallyExists) {
+      if (!employee) {
         throw new UnauthorizedException('Funcionário não encontrado');
       }
 
@@ -282,11 +282,11 @@ export class RefreshTokensService {
             AND is_valid = true
           RETURNING *
         `,
-          [refreshTokenIdIncoming, doesEmployeeReallyExists.id],
+          [refreshTokenIdIncoming, employee.id],
         );
 
       if (!updateToken) {
-        await this.RevokeAllEmployee(doesEmployeeReallyExists, false);
+        await this.RevokeAllEmployee(employee, false);
 
         throw new UnauthorizedException(
           'Refresh token inválido ou já utilizado',
@@ -344,13 +344,13 @@ export class RefreshTokensService {
     let refreshToken: string = '';
 
     try {
-      const doesUserReallyExists = await queryRunner.manager.findOne(User, {
+      const user = await queryRunner.manager.findOne(User, {
         where: {
           id: userData.id,
         },
       });
 
-      if (!doesUserReallyExists) {
+      if (!user) {
         throw new UnauthorizedException('Usuário não encontrado');
       }
 
@@ -363,11 +363,11 @@ export class RefreshTokensService {
             AND is_valid = true
           RETURNING *
         `,
-        [refreshTokenIdIncoming, doesUserReallyExists.id],
+        [refreshTokenIdIncoming, user.id],
       );
 
       if (!updateToken) {
-        await this.RevokeAllUser(doesUserReallyExists, false);
+        await this.RevokeAllUser(user, false);
 
         throw new UnauthorizedException(
           'Refresh token inválido ou já utilizado',

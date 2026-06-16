@@ -24,8 +24,7 @@ export class EmailService {
         alertData,
       );
 
-      // Tirar em produção depois de testar (a variável send e o log)
-      const send = await this.mailerService.sendMail({
+      await this.mailerService.sendMail({
         to: forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email,
         subject: 'Alerta de segurança',
         template: html,
@@ -35,10 +34,8 @@ export class EmailService {
       });
 
       this.logger.log(
-        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}\n`,
+        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}`,
       );
-
-      this.logger.log(send);
 
       return {
         success: true,
@@ -57,8 +54,7 @@ export class EmailService {
     try {
       const html = await this.RenderTemplate('user-session-alert', alertData);
 
-      // Tirar em produção depois de testar (a variável send e o log)
-      const send = await this.mailerService.sendMail({
+      await this.mailerService.sendMail({
         to: forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email,
         subject: 'Alerta de segurança',
         template: html,
@@ -68,10 +64,8 @@ export class EmailService {
       });
 
       this.logger.log(
-        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}\n`,
+        `Email enviado para ${forSupportTeam === true ? process.env.FROM_EMAIL : alertData.email}`,
       );
-
-      this.logger.log(send);
 
       return {
         success: true,
@@ -91,7 +85,7 @@ export class EmailService {
       await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
         subject: `Erro ao criar logs de ${userOrEmployeeLog}`,
-        template: '<h1>Erro na cração de logs do usuário</h1>',
+        template: '<h1>Erro na criação de logs do usuário</h1>',
       });
 
       this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}`);
@@ -117,8 +111,7 @@ export class EmailService {
         resetPasswordLink,
       });
 
-      // Tirar em produção depois de testar (a variável send e o log)
-      const send = await this.mailerService.sendMail({
+      await this.mailerService.sendMail({
         to: userEmail,
         subject: 'Redefinição de senha',
         template: html,
@@ -127,9 +120,7 @@ export class EmailService {
         },
       });
 
-      this.logger.log(`Email enviado para ${userEmail}\n`);
-
-      this.logger.log(send);
+      this.logger.log(`Email enviado para ${userEmail}`);
     } catch (error) {
       this.logger.error(`Erro ao enviar email para ${userEmail}`, error);
 
@@ -152,8 +143,7 @@ export class EmailService {
 
       const html = await this.RenderTemplate('stock-alert', productData);
 
-      // Tirar em produção depois de testar
-      const send = await this.mailerService.sendMail({
+      await this.mailerService.sendMail({
         to: process.env.FROM_EMAIL,
         subject: 'Produto com baixo estoque ou esgotado',
         template: html,
@@ -162,9 +152,7 @@ export class EmailService {
         },
       });
 
-      this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}\n`);
-
-      this.logger.log(send);
+      this.logger.log(`Email enviado para ${process.env.FROM_EMAIL}`);
 
       return {
         success: true,
@@ -192,7 +180,7 @@ export class EmailService {
       return html;
     } catch (error) {
       ErrorManagement(error, GeneralErrorType.INTERNAL, {
-        logger: 'Erro ao renderizar template orders-status.ejs:',
+        logger: 'Erro ao renderizar template de email:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao renderizar template',
         generalError: 'Erro ao renderizar template',
