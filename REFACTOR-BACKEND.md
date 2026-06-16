@@ -89,17 +89,17 @@
 - [ ] **1d (SCHEMA, requer migration revisada — D4):** remover `PaymentConfirmation` (entidade+relação em `Order`), enum `PaymentStatus`, valores de pagamento de `OrderStatus`, `RefundReason` e colunas de refund/cancel/payment de `Order`. **Hoje dormentes** (código não usa, tabela/colunas intactas em prod). NÃO rodar `migration:run` sem revisão do dono.
 - [ ] Definir fluxo de pedido sobrevivente (criação + listagem) e reativar só o controller necessário — **decisão pendente com o dono** (orders está 100% comentado; confirmar se o front cria pedido no backend ou só abre WhatsApp).
 
-### Fase 2 — DRY (extrair helpers)  `[ ] pendente`
-- [ ] Helper `runInTransaction(dataSource, fn)` para o boilerplate de queryRunner.
-- [ ] Helper único de ajuste de estoque (usar `increment`/`decrement`).
-- [ ] Unificar métodos de busca paginada quase idênticos em `order.service`.
-- [ ] Tipar `ErrorManagement(...)` como `never`.
+### Fase 2 — DRY (extrair helpers)  `[~] PARCIAL`
+- [x] Tipado `ErrorManagement(...)` como `never` (narrowing nos call sites).
+- [x] Unificadas as buscas paginadas de `order.service` em `SearchOrders()` + `RequireUser()`; removidos os checks mortos `if (!result) throw Internal`.
+- [ ] Helper de transação (`RunInTransaction`): **adiado** — sem ponto de adoção limpo agora (acopla collaborators a `QueryRunner`; `product.*` tem WIP; `order.Create` pende redesenho). Entra junto da 1ª adoção real. Pré-requisito: migrar `refreshToken.CreateEmployee/CreateUser`, `logs.CreateLog*`, `order.PriceCalculate`, `product.ReplaceImage/UpdateRegularData` de `QueryRunner`→`EntityManager`.
+- [ ] Helper de ajuste de estoque (`increment`/`decrement`) — junto da limpeza de `product.service`.
 
-### Fase 3 — De-AI do estilo (sem mudar comportamento)  `[ ] pendente`
-- [ ] Remover emojis dos logs.
-- [ ] Remover comentários redundantes/bilíngues/placeholder e blocos comentados.
-- [ ] Renomear variáveis verbosas (`doesXReallyExists` → `existing`/contexto).
-- [ ] Corrigir typos.
+### Fase 3 — De-AI do estilo (sem mudar comportamento)  `[~] PARCIAL`
+- [x] `email.service`: removidos comentários placeholder ("Tirar em produção"), debug `logger.log(send)` (despejava resposta SMTP) e typos ("cração", msg stale "orders-status.ejs").
+- [x] `refresh-token.service`: `doesEmployeeReallyExists`/`doesUserReallyExists` → `employee`/`user`.
+- [x] `auth.service`: typo "suceso" → "sucesso".
+- [ ] `product.service`: emojis (✅⚠️ etc.), `doesXReallyExists`, comentários numerados/placeholder ("Você pode...") — **adiado** até a WIP do dono em `product.controller.ts`/`product.service.ts` ser resolvida (evita misturar commits).
 
 ### Fase 4 — Padronizar camelCase (D1)  `[ ] pendente`
 - [ ] Renomear métodos públicos de services + controllers + call sites (verificado por compilação).
@@ -124,4 +124,5 @@
 | Data | Fase/Tarefa | Arquivos tocados | Notas |
 |------|-------------|------------------|-------|
 | 2026-06-16 | Diagnóstico + plano | (somente leitura) | Criado este guia. Decisões D1–D5 fixadas. Nada alterado em código. |
-| 2026-06-16 | Fase 0 + Fase 1 (código) | `src/checkout/*` (del), `email.service.ts`, `email.module.ts`, `email/templates/*` (del 9), `order.service.ts`, `interfaces/email-template.ts` (del) | Branch `refactor/backend-kiss`. Removido checkout órfão + emails/StockRelease mortos + dep circular. −2624 linhas, 21 arquivos. Build verde, testes ok. Schema (PaymentConfirmation/colunas) deixado dormente → Fase 1d (migration revisada). Não comitado. |
+| 2026-06-16 | Fase 0 + Fase 1 (código) | `src/checkout/*` (del), `email.service.ts`, `email.module.ts`, `email/templates/*` (del 9), `order.service.ts`, `interfaces/email-template.ts` (del) | Branch `refactor/backend-kiss`. Removido checkout órfão + emails/StockRelease mortos + dep circular. −2624 linhas, 21 arquivos. Build verde, testes ok. Schema (PaymentConfirmation/colunas) deixado dormente → Fase 1d (migration revisada). Commit `refactor: remove dead payment/checkout module`. |
+| 2026-06-16 | Fase 2 + Fase 3 (parcial) | `utils/error.util.ts`, `orders/order.service.ts`, `email/email.service.ts`, `refresh-tokens/refresh-token.service.ts`, `auth/auth.service.ts` | DRY: `SearchOrders`/`RequireUser` no order.service, `ErrorManagement: never`. De-AI: limpeza email + rename refresh + typo auth. Build verde, testes ok. `product.*` adiado (WIP do dono). Helper de transação adiado (sem adoção limpa). Convenção de commit: **Conventional Commits, curtos e diretos**. |
