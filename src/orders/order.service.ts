@@ -14,7 +14,13 @@ import { EmailService } from 'src/email/email.service';
 import { Product } from 'src/products/entities/product.entity';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/user.service';
-import { DataSource, In, QueryRunner, Repository } from 'typeorm';
+import {
+  DataSource,
+  FindManyOptions,
+  In,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
 
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { ErrorManagement } from 'src/utils/error.util';
@@ -258,19 +264,11 @@ export class OrdersService {
   }
 
   async ListOrdersUsers(tokenPayloadDTO: TokenPayloadDTO) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
-
-    if (!findUser) {
-      throw new UnauthorizedException('Ação não permitida');
-    }
+    const user = await this.RequireUser(tokenPayloadDTO.sub);
 
     const [findAll, total] = await this.ordersRepository.findAndCount({
-      where: {
-        user: findUser,
-      },
-      order: {
-        id: 'desc',
-      },
+      where: { user },
+      order: { id: 'desc' },
     });
 
     return [total, ...findAll];
@@ -279,200 +277,96 @@ export class OrdersService {
   async FindByPriceEmployees(paginationByPriceDTO: PaginationByPriceDTO) {
     const { limit, offset, value } = paginationByPriceDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.SearchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        total_price: value,
-      },
+      order: { id: 'desc' },
+      where: { total_price: value },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
   async FindByPriceUsers(
     paginationByPriceDTO: PaginationByPriceDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
-
-    if (!findUser) {
-      throw new UnauthorizedException('Ação não permitida');
-    }
-
+    const user = await this.RequireUser(tokenPayloadDTO.sub);
     const { limit, offset, value } = paginationByPriceDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.SearchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        total_price: value,
-        user: findUser,
-      },
+      order: { id: 'desc' },
+      where: { total_price: value, user },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
   async FindByItemEmployees(paginationDTO: PaginationDTO) {
     const { limit, offset, value } = paginationDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.SearchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        items: {
-          product_name: value,
-        },
-      },
+      order: { id: 'desc' },
+      where: { items: { product_name: value } },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
   async FindByItemUsers(
     paginationDTO: PaginationDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
-
-    if (!findUser) {
-      throw new UnauthorizedException('Ação não permitida');
-    }
-
+    const user = await this.RequireUser(tokenPayloadDTO.sub);
     const { limit, offset, value } = paginationDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.SearchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        items: {
-          product_name: value,
-        },
-        user: findUser,
-      },
+      order: { id: 'desc' },
+      where: { items: { product_name: value }, user },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
   async FindByStatus(paginationByStatusDTO: PaginationByStatusDTO) {
     const { limit, offset, value } = paginationByStatusDTO;
 
-    const [orderFindByStatus, total] = await this.ordersRepository.findAndCount(
-      {
-        take: limit,
-        skip: offset,
-        order: {
-          id: 'desc',
-        },
-        where: {
-          status: value,
-        },
-      },
-    );
-
-    if (!orderFindByStatus) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByStatus.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByStatus];
+    return this.SearchOrders({
+      take: limit,
+      skip: offset,
+      order: { id: 'desc' },
+      where: { status: value },
+    });
   }
 
   async FindByUser(paginationByUserDTO: PaginationByUserDTO) {
     const { limit, offset, value } = paginationByUserDTO;
 
-    const [orderFindByUser, total] = await this.ordersRepository.findAndCount({
+    return this.SearchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        user: {
-          id: value,
-        },
-      },
-      relations: {
-        user: true,
-      },
-      select: {
-        user: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      order: { id: 'desc' },
+      where: { user: { id: value } },
+      relations: { user: true },
+      select: { user: { id: true, name: true, email: true } },
     });
+  }
 
-    if (!orderFindByUser) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
+  private async RequireUser(sub: string) {
+    const user = await this.usersService.FindById(sub);
+
+    if (!user) {
+      throw new UnauthorizedException('Ação não permitida');
     }
 
-    if (orderFindByUser.length < 1) {
+    return user;
+  }
+
+  private async SearchOrders(options: FindManyOptions<Order>) {
+    const [orders, total] = await this.ordersRepository.findAndCount(options);
+
+    if (orders.length < 1) {
       throw new NotFoundException('Pedidos não encontrados');
     }
 
-    return [total, ...orderFindByUser];
+    return [total, ...orders];
   }
 }

@@ -13,7 +13,7 @@ export function ErrorManagement(
   error: unknown,
   generalErrorType: GeneralErrorType,
   messages: ErrorMessages,
-) {
+): never {
   const logger = new Logger('errorManagement');
   const manageError = GetErrorMessage(error);
 
@@ -36,11 +36,9 @@ export function ErrorManagement(
     throw error;
   }
 
-  switch (generalErrorType) {
-    case GeneralErrorType.INTERNAL:
-      throw new InternalServerErrorException(messages.generalError);
-
-    case GeneralErrorType.UNAUTHORIZED:
-      throw new UnauthorizedException(messages.generalError);
+  if (generalErrorType === GeneralErrorType.UNAUTHORIZED) {
+    throw new UnauthorizedException(messages.generalError);
   }
+
+  throw new InternalServerErrorException(messages.generalError);
 }
