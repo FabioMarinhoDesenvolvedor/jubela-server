@@ -75,16 +75,13 @@ export class ProductsService {
     await queryRunner.startTransaction();
 
     try {
-      const doesEmployeeReallyExists = await queryRunner.manager.findOne(
-        Employee,
-        {
-          where: {
-            id: tokenPayloadDTO.sub,
-          },
+      const existingEmployee = await queryRunner.manager.findOne(Employee, {
+        where: {
+          id: tokenPayloadDTO.sub,
         },
-      );
+      });
 
-      if (!doesEmployeeReallyExists) {
+      if (!existingEmployee) {
         throw new NotFoundException('Funcionário não encontrado');
       }
 
@@ -135,9 +132,7 @@ export class ProductsService {
         const publicIds = uploadResults.map((results) => results.public_id);
         await this.cloudinaryService.DeleteMultipleImages(publicIds);
       } catch (cleanupError) {
-        // Se cleanup falhar, loga mas não quebra a aplicação
         this.logger.error('Erro ao fazer cleanup das imagens:', cleanupError);
-        // Você pode enviar para um sistema de log/monitoramento aqui
       }
 
       ErrorManagement(error, GeneralErrorType.INTERNAL, {
@@ -280,10 +275,9 @@ export class ProductsService {
       throw new NotFoundException('Imagem não encontrada');
     }
 
-    // Guarda informações da imagem antiga
     const { publicId: oldPublicId } = imageToReplace;
 
-    // 2. Upload da nova imagem ANTES da transação
+    // Upload da nova imagem antes da transação
     let uploadResult: UploadApiResponse;
     try {
       const results = await this.cloudinaryService.UploadMultipleImages(
@@ -300,20 +294,16 @@ export class ProductsService {
       });
     }
 
-    // 3. Transação: Atualiza no banco
-
-    // ✅ ATUALIZA a entidade existente (não cria nova)
+    // Atualiza a imagem existente, mantendo isMain e order
     imageToReplace.url = uploadResult.secure_url;
     imageToReplace.publicId = uploadResult.public_id;
-    // isMain e order permanecem iguais
 
     await queryRunnerSub.manager.save(ProductImages, imageToReplace);
 
-    // 4. Deleta a imagem antiga do Cloudinary
     try {
       await this.cloudinaryService.DeleteMultipleImages([oldPublicId]);
     } catch (error) {
-      // Cleanup: deleta nova imagem do Cloudinary para não deixar órfã
+      // Reverte a nova imagem no Cloudinary para não deixar órfã
       try {
         await this.cloudinaryService.DeleteMultipleImages([
           uploadResult.public_id,
@@ -346,7 +336,6 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Validação: limite máximo de imagens
     const MAX_IMAGES = 4;
     if (product.images.length + files.length > MAX_IMAGES) {
       throw new BadRequestException(
@@ -354,7 +343,6 @@ export class ProductsService {
       );
     }
 
-    // 1. Upload das novas imagens
     let uploadResults: UploadApiResponse[];
     try {
       uploadResults = await this.cloudinaryService.UploadMultipleImages(
@@ -371,37 +359,31 @@ export class ProductsService {
       });
     }
 
-    // 2. Transação: Adiciona no banco
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const doesProductReallyExists = await queryRunner.manager.findOne(
-        Product,
-        {
-          where: {
-            id: productId,
-          },
+      const existingProduct = await queryRunner.manager.findOne(Product, {
+        where: {
+          id: productId,
         },
-      );
+      });
 
-      if (!doesProductReallyExists) {
+      if (!existingProduct) {
         throw new NotFoundException('Produto não encontrado');
       }
 
-      // Pega a maior ordem atual
       const currentMaxOrder =
         product.images.length > 0
           ? Math.max(...product.images.map((img) => img.order))
           : 0;
 
-      // Cria novas entidades de imagem
       const newImages = uploadResults.map((result, index) => {
         return queryRunner.manager.create(ProductImages, {
           url: result.secure_url,
           publicId: result.public_id,
-          isMain: false, // Novas imagens não são principais
+          isMain: false,
           order: currentMaxOrder + index + 1,
           product: product,
         });
@@ -420,7 +402,6 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      // Cleanup: deleta do Cloudinary
       const publicIds = uploadResults.map((r) => r.public_id);
       try {
         await this.cloudinaryService.DeleteMultipleImages(publicIds);
@@ -488,12 +469,11 @@ export class ProductsService {
       try {
         await this.cloudinaryService.DeleteMultipleImages([publicIdToDelete]);
       } catch (cloudinaryError) {
-        // ⚠️ Banco já foi commitado, então não podemos reverter
-        // Loga o erro para investigação/cleanup manual
+        // Banco já commitado: imagem fica órfã no Cloudinary, apenas loga
         const errorMessage = GetErrorMessage(cloudinaryError);
 
         this.logger.error(
-          `ATENÇÃO: Imagem deletada do banco mas falhou no Cloudinary:`,
+          `Imagem deletada do banco mas falhou no Cloudinary:`,
           {
             productId,
             imageId,
@@ -501,11 +481,6 @@ export class ProductsService {
             error: errorMessage,
           },
         );
-
-        // Aqui você poderia:
-        // - Adicionar em uma fila de cleanup
-        // - Enviar alerta para monitoramento
-        // - Gravar em tabela de "orphan_images" para cleanup posterior
       }
 
       return this.productsRepository.findOne({
@@ -579,12 +554,6 @@ export class ProductsService {
     try {
       await this.cloudinaryService.DeleteMultipleImages(publicIds);
     } catch (error) {
-      // // Registra órfãos para cleanup
-      // await this.orphanCleanupService.logOrphanImages(
-      //   publicIds,
-      //   productId,
-      //   'Produto deletado',
-      // );
       ErrorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro do cloudinary - múltiplas imagens',
         queryFailedError: '',
