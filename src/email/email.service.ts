@@ -169,12 +169,7 @@ export class EmailService {
 
   private async renderTemplate(templateFile: string, data: any) {
     try {
-      const templatePath = join(
-        process.cwd(),
-        'src',
-        'templates',
-        `${templateFile}.ejs`,
-      );
+      const templatePath = join(__dirname, 'templates', `${templateFile}.ejs`);
 
       const html = (await ejs.renderFile(templatePath, data)) as string;
       return html;
