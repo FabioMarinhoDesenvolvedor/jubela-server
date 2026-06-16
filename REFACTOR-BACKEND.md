@@ -101,21 +101,30 @@
 - [x] `auth.service`: typo "suceso" → "sucesso".
 - [ ] `product.service`: emojis (✅⚠️ etc.), `doesXReallyExists`, comentários numerados/placeholder ("Você pode...") — **adiado** até a WIP do dono em `product.controller.ts`/`product.service.ts` ser resolvida (evita misturar commits).
 
-### Fase 4 — Padronizar camelCase (D1)  `[ ] pendente`
-- [ ] Renomear métodos públicos de services + controllers + call sites (verificado por compilação).
+### Fase 4 — Padronizar camelCase (D1)  `[x] CONCLUÍDA`
+- [x] Métodos de services/controllers/guards + funções utilitárias (`errorManagement`, `getErrorMessage`) → camelCase. Rotas HTTP inalteradas. Rename via padrões ancorados (`.metodo(` + definições), validado por build.
 
-### Fase 5 — Fix de bugs vivos (D2, documentar)  `[ ] pendente`
-- [ ] `products.Create` (check de variável errada).
-- [ ] `products.Update` (loop de updatesPerformed).
-- [ ] `products.StockCheck` (null-safety + remover param/uso).
-- [ ] `auth.CreateTokensUser` (email inalcançável).
-- [ ] `auth.UpdatePassword` (remover log de PII/token).
+### Fase 5 — Fix de bugs vivos (D2, documentar)  `[x] CONCLUÍDA`
+- [x] `products.create`: validava `createProduct` (não-persistido) → `createdProduct`.
+- [x] `products.update`: loop empilhava o array de chaves → `updatesPerformed.push(...campos)` uma vez.
+- [x] `products.stockCheck`: null-safety + removido param `orderId` morto e `eslint-disable`.
+- [x] `auth.createTokensUser`: e-mail de alerta agora roda antes de `errorManagement` (que lança).
+- [x] `auth.updatePassword`: removido `logger.log` do registro de reset (hash/PII).
+- [x] **Bonus:** `email.renderTemplate` apontava p/ `src/templates` → `__dirname`; `nest-cli.json` passa a copiar `.ejs` p/ `dist` (e-mail estava quebrado em prod).
 
-### Fase 6 — Hardening & consistência  `[ ] pendente`
-- [ ] Reconciliar CORS/CSRF com README.
-- [ ] Revisar `synchronize` (segurança em prod).
-- [ ] Padrão de retorno de paginação.
-- [ ] Build + lint + testes verdes; atualizar README se necessário.
+### Fase 6 — Hardening & consistência  `[x] CONCLUÍDA`
+- [x] Removido scaffolding morto de CSRF (`SkipCsrf`, `SKIP_CSRF_KEY`, restos comentados); README alinhado.
+- [x] `app.config`: `Boolean(env)` → `env === 'true'` (evitava synchronize/autoLoadEntities ligarem por engano).
+- [x] Lint: `endOfLine: 'auto'` no Prettier → 0 erros (eram ~8000 por CRLF) sem reescrever todos os arquivos.
+- [x] **Paginação `[total, ...rows]`:** decidido **manter** — controllers ativos (products/employees/users) e frontend dependem do formato. Mudança ficaria para um redesenho de contrato de API.
+- [x] Build + lint + testes verdes.
+
+---
+
+## 🔓 EM ABERTO (próximas sessões / decisão do dono)
+- **Fase 1d (schema/migration):** remover `PaymentConfirmation`, colunas de payment/refund/cancel em `Order`, enums `PaymentStatus`/`RefundReason`/valores de pagamento em `OrderStatus`. Hoje dormentes. Requer migration revisada (prod ativo, D4).
+- **Fluxo de pedido:** `OrdersController` segue 100% comentado → backend não cria/lista pedidos. Definir se o front cria pedido no backend (reativar controller) ou se ficou só no WhatsApp.
+- **Helper de transação (`RunInTransaction`):** introduzir junto da 1ª adoção real, migrando collaborators de `QueryRunner`→`EntityManager`.
 
 ---
 
@@ -126,3 +135,4 @@
 | 2026-06-16 | Diagnóstico + plano | (somente leitura) | Criado este guia. Decisões D1–D5 fixadas. Nada alterado em código. |
 | 2026-06-16 | Fase 0 + Fase 1 (código) | `src/checkout/*` (del), `email.service.ts`, `email.module.ts`, `email/templates/*` (del 9), `order.service.ts`, `interfaces/email-template.ts` (del) | Branch `refactor/backend-kiss`. Removido checkout órfão + emails/StockRelease mortos + dep circular. −2624 linhas, 21 arquivos. Build verde, testes ok. Schema (PaymentConfirmation/colunas) deixado dormente → Fase 1d (migration revisada). Commit `refactor: remove dead payment/checkout module`. |
 | 2026-06-16 | Fase 2 + Fase 3 (parcial) | `utils/error.util.ts`, `orders/order.service.ts`, `email/email.service.ts`, `refresh-tokens/refresh-token.service.ts`, `auth/auth.service.ts` | DRY: `SearchOrders`/`RequireUser` no order.service, `ErrorManagement: never`. De-AI: limpeza email + rename refresh + typo auth. Build verde, testes ok. `product.*` adiado (WIP do dono). Helper de transação adiado (sem adoção limpa). Convenção de commit: **Conventional Commits, curtos e diretos**. |
+| 2026-06-16 | WIP product + Fases 3→6 | `product.*` (WIP do dono commitada), todos os services/controllers (camelCase), `app.config`, `auth.*`, `email.*`, `nest-cli.json`, `main.ts`, `.prettierrc`, `README` | Commitada WIP do dono (fix rota price + busca por categoria). De-AI no product. **Fase 4** camelCase (métodos+utils). **Fase 5** bugs (products/auth + caminho de template e assets de email). **Fase 6** CSRF morto removido, parsing de env seguro, lint 0 erros (endOfLine auto), paginação mantida. Build/lint/testes verdes. Tudo comitado no branch `refactor/backend-kiss` (não pushado). |
