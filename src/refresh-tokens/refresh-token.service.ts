@@ -259,14 +259,11 @@ export class RefreshTokensService {
     let refreshToken: string = '';
 
     try {
-      const employee = await queryRunner.manager.findOne(
-        Employee,
-        {
-          where: {
-            id: employeeData.id,
-          },
+      const employee = await queryRunner.manager.findOne(Employee, {
+        where: {
+          id: employeeData.id,
         },
-      );
+      });
 
       if (!employee) {
         throw new UnauthorizedException('Funcionário não encontrado');
