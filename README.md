@@ -44,13 +44,14 @@ Limites configurados por tipo de operação:<br>
 - refresh: 10 requisições/minuto
 - write: 10 requisições/10 segundos (criação/atualização)
 - read: 50 requisições/10 segundos (consultas)
+- preference: 10 requisições/minuto
 - global: 100 requisições/minuto
 
 ### CORS
 
 - Configurado para permitir credenciais
-- Lista de origens permitidas configurável via `.env`
-- Headers personalizados permitidos (X-CSRF-Token)
+- Lista de origens permitidas definida em `main.ts`
+- Headers permitidos: `Content-Type`, `Authorization`, `X-Requested-With`
 
 ### Cookies Seguros
 

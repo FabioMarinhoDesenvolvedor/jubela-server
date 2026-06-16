@@ -13,7 +13,6 @@ import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { GoogleAuthGuard } from './guards/google.guard';
 import { GoogleAuthUser } from './params/google-user.param';
 
-// @SkipCsrf()
 @SkipThrottle({ read: true, write: true, refresh: true, preference: true })
 @Controller('auth')
 export class AuthController {
