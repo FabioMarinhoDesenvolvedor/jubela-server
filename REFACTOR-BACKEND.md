@@ -19,6 +19,13 @@
 
 **Regra de ouro:** cada sessão e cada código → atualize este .md antes de encerrar.
 
+### 📌 REGRAS BÁSICAS (antes de iniciar QUALQUER tarefa)
+1. Leia `docs/memory/README.md` (índice de memórias do projeto).
+2. Consulte as **decisões** relacionadas (seção DECISÕES deste guia + memórias).
+3. Consulte os **gotchas** relevantes (achados/bugs já mapeados aqui).
+4. **Evite contradizer decisões existentes** — se precisar mudar, registre o porquê.
+5. Ao final da sessão, **sugira novas memórias** ao dono.
+
 ---
 
 ## 🎯 DECISÕES (fixadas com o dono em 2026-06-16)
@@ -129,6 +136,7 @@
 ---
 
 ## 📝 LOG DE SESSÕES
+
 
 | Data | Fase/Tarefa | Arquivos tocados | Notas |
 |------|-------------|------------------|-------|
