@@ -179,8 +179,24 @@ reiniciar. Sem isso o upload lança e o cadastro (imagem obrigatória) falha.
   generalizar `ResetPassword` (ex.: relação opcional com employee ou campo de tipo de conta) +
   rotas/serviço + UI de "esqueci a senha" no login admin. Reaproveita o e-mail `resetPassword`.
 
-**Decisões pendentes do dono:** confirmar e-mail/papel do admin; escolher seed-script vs SQL; e quais
-das opções 3a/3b implementar.
+**Decisões (confirmadas pelo dono 2026-06-17):** admin = `fabiomarinho202020@gmail.com`, papel `admin`;
+acesso via **script de seed**; implementar as **três** formas de troca de senha (self-service logado,
+"esqueci a senha" do admin por e-mail, e reset por outro admin).
+
+**Execução planejada (aguardando "pode codar"):**
+- **Fase A — Destravar cadastro (prioridade):**
+  1. (Dono) Setar envs do Cloudinary no Render + reiniciar.
+  2. `src/seeds/seed-admin.ts` (NestJS standalone via `createApplicationContext`): cria-ou-atualiza o
+     admin lendo `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`/`SEED_ADMIN_NAME` do env (senha **não**
+     fica no repo), hash via `HashingService`, garante `role` ⊇ `[admin]` e `situation='empregado'`.
+     Script npm `seed:admin`. Rodar 1x (local apontando p/ DB de prod, ou job no Render).
+- **Fase B — Trocar senha logado:** endpoint dedicado `PATCH /employees/change-password` que **valida a
+  senha atual** antes de trocar (mais seguro que o `update/self` atual) + tela no painel admin.
+- **Fase C — "Esqueci a senha" do admin:** generalizar `ResetPassword` para `Employee` (**migration**,
+  D4 — prod ativo) + serviço/rotas `POST /auth/employee/forgot-password` e `/auth/employee/reset-password`
+  + e-mail (reusa `emailService`) + UI "esqueci a senha" no login admin.
+- **Fase D — Reset por outro admin:** UI de gestão de funcionários (lista + resetar senha) sobre o
+  `PATCH /employees/update/admin/:id` já existente.
 
 ## 🔓 EM ABERTO (próximas sessões / decisão do dono)
 - **Fase 1d (schema/migration):** remover `PaymentConfirmation`, colunas de payment/refund/cancel em `Order`, enums `PaymentStatus`/`RefundReason`/valores de pagamento em `OrderStatus`. Hoje dormentes. Requer migration revisada (prod ativo, D4).
