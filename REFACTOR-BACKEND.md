@@ -151,6 +151,37 @@ produto com `images`. **O código do cadastro está completo e correto.** Pontos
 4. **Funcionário com papel `EDIT_PRODUCTS`** existente no banco de produção (o cadastro é restrito a esse
    papel; login admin é via `POST /auth/employee`).
 
+## 🗝️ PLANO — Acesso admin, troca de senha e Cloudinary (2026-06-17, só planejamento)
+
+**Achados (login/senha):**
+- Admin = `Employee`; login `POST /auth/employee`; senha em **bcrypt** (não recuperável). `role` é
+  **array** `EmployeeRole[]`; `RoutePolicyGuard` libera tudo se incluir `admin`.
+- `POST /employees` (criar funcionário) exige papel `admin` → **bootstrap circular**; **não há seed**.
+- **Reset de senha existe só para `User` (cliente)**: `auth.resetPassword`/`updatePassword` +
+  `ResetPassword.user` + rotas `POST /auth/forgot-password` e `/auth/reset-password`. **Employee não
+  tem reset**; só `PATCH /employees/update/self/:id` (logado) ou `update/admin/:id` (outro admin).
+
+**1) Cloudinary (bloqueio confirmado do cadastro):** definir no Render
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (do dashboard Cloudinary) e
+reiniciar. Sem isso o upload lança e o cadastro (imagem obrigatória) falha.
+
+**2) Acesso admin agora (break-glass):**
+- Diagnóstico: `SELECT id, email, role, situation FROM employee;` no Postgres do Render p/ ver se
+  `fabiomarinho202020@gmail.com` existe e seu papel.
+- Definir senha conhecida: **script de seed idempotente** (cria-ou-atualiza admin com senha definida,
+  hash via `HashingService`) — opção limpa e repetível. Alternativa: `UPDATE employee SET password_hash=...`
+  com hash bcrypt gerado por script. Garantir `role` contém `admin` e `situation='empregado'`.
+
+**3) "Trocar senha" (a implementar — planejado):**
+- a) **Self-service (logado):** tela no painel admin chamando `PATCH /employees/update/self/:id`
+  (já existe no back) — falta só a UI.
+- b) **"Esqueci a senha" do admin:** estender o fluxo de reset para `Employee` (hoje só `User`):
+  generalizar `ResetPassword` (ex.: relação opcional com employee ou campo de tipo de conta) +
+  rotas/serviço + UI de "esqueci a senha" no login admin. Reaproveita o e-mail `resetPassword`.
+
+**Decisões pendentes do dono:** confirmar e-mail/papel do admin; escolher seed-script vs SQL; e quais
+das opções 3a/3b implementar.
+
 ## 🔓 EM ABERTO (próximas sessões / decisão do dono)
 - **Fase 1d (schema/migration):** remover `PaymentConfirmation`, colunas de payment/refund/cancel em `Order`, enums `PaymentStatus`/`RefundReason`/valores de pagamento em `OrderStatus`. Hoje dormentes. Requer migration revisada (prod ativo, D4).
 - **Fluxo de pedido:** `OrdersController` segue 100% comentado → backend não cria/lista pedidos. Definir se o front cria pedido no backend (reativar controller) ou se ficou só no WhatsApp.
