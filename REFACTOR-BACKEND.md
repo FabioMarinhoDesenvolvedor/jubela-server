@@ -128,83 +128,10 @@
 
 ---
 
-## 🔍 REVISÃO — Cadastro de produtos (2026-06-17, só leitura)
-
-**Fluxo:** `POST /products` (multipart) → `ProductsController.create` (guard `EDIT_PRODUCTS`,
-`FilesInterceptor` 1–4 imgs JPEG/PNG ≤5MB) → `ProductsService.create`: valida funcionário do token,
-sobe imagens no Cloudinary, transação cria `Product` + `ProductImages` (1ª = `isMain`), retorna o
-produto com `images`. **O código do cadastro está completo e correto.** Pontos confirmados:
-- DTO (`CreateProductDTO`) bate 1:1 com o payload do front (`price` string decimal, `quantity`/`lowStock`
-  via `@Transform(parseInt)`, `sku`/`name`/`category`/`description`). `ValidationPipe` global tem
-  `transform:true` → os `@Transform` rodam. `whitelist`+`forbidNonWhitelisted` ok (front não manda campo extra).
-- `Product.images` é **`eager:true`** → a listagem pública `GET /products` já retorna a galeria (por isso
-  a vitrine e a página de produto do front funcionam mesmo sem `GET /:id`).
-- Auth cross-site (Vercel × Render): cookies `httpOnly` + `secure(prod)` + `sameSite:'none'` — corretos.
-
-**O que falta para o cadastro FUNCIONAR em produção (ambiente/dados, não código) — A CONFIRMAR:**
-1. **`NODE_ENV=production` no Render** — com `sameSite:'none'` o navegador exige `Secure`; se `NODE_ENV`
-   não for `production`, `secure:false` e o cookie de sessão é **descartado** → admin não autentica →
-   cadastro falha. *(Suspeito nº1.)*
-2. **CORS:** hoje libera só `https://jubela-client.vercel.app` + localhost. Confirmar o **domínio real**
-   do front em produção; se for outro, todas as chamadas autenticadas são bloqueadas.
-3. **Cloudinary:** variáveis de ambiente configuradas no Render (sem elas o upload falha).
-4. **Funcionário com papel `EDIT_PRODUCTS`** existente no banco de produção (o cadastro é restrito a esse
-   papel; login admin é via `POST /auth/employee`).
-
-## 🗝️ PLANO — Acesso admin, troca de senha e Cloudinary (2026-06-17, só planejamento)
-
-**Achados (login/senha):**
-- Admin = `Employee`; login `POST /auth/employee`; senha em **bcrypt** (não recuperável). `role` é
-  **array** `EmployeeRole[]`; `RoutePolicyGuard` libera tudo se incluir `admin`.
-- `POST /employees` (criar funcionário) exige papel `admin` → **bootstrap circular**; **não há seed**.
-- **Reset de senha existe só para `User` (cliente)**: `auth.resetPassword`/`updatePassword` +
-  `ResetPassword.user` + rotas `POST /auth/forgot-password` e `/auth/reset-password`. **Employee não
-  tem reset**; só `PATCH /employees/update/self/:id` (logado) ou `update/admin/:id` (outro admin).
-
-**1) Cloudinary (bloqueio confirmado do cadastro):** definir no Render
-`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (do dashboard Cloudinary) e
-reiniciar. Sem isso o upload lança e o cadastro (imagem obrigatória) falha.
-
-**2) Acesso admin agora (break-glass):**
-- Diagnóstico: `SELECT id, email, role, situation FROM employee;` no Postgres do Render p/ ver se
-  `fabiomarinho202020@gmail.com` existe e seu papel.
-- Definir senha conhecida: **script de seed idempotente** (cria-ou-atualiza admin com senha definida,
-  hash via `HashingService`) — opção limpa e repetível. Alternativa: `UPDATE employee SET password_hash=...`
-  com hash bcrypt gerado por script. Garantir `role` contém `admin` e `situation='empregado'`.
-
-**3) "Trocar senha" (a implementar — planejado):**
-- a) **Self-service (logado):** tela no painel admin chamando `PATCH /employees/update/self/:id`
-  (já existe no back) — falta só a UI.
-- b) **"Esqueci a senha" do admin:** estender o fluxo de reset para `Employee` (hoje só `User`):
-  generalizar `ResetPassword` (ex.: relação opcional com employee ou campo de tipo de conta) +
-  rotas/serviço + UI de "esqueci a senha" no login admin. Reaproveita o e-mail `resetPassword`.
-
-**Decisões (confirmadas pelo dono 2026-06-17):** admin = `fabiomarinho202020@gmail.com`, papel `admin`;
-acesso via **script de seed**; implementar as **três** formas de troca de senha (self-service logado,
-"esqueci a senha" do admin por e-mail, e reset por outro admin).
-
-**Execução planejada (aguardando "pode codar"):**
-- **Fase A — Destravar cadastro (prioridade):**
-  1. (Dono) Setar envs do Cloudinary no Render + reiniciar.
-  2. `src/seeds/seed-admin.ts` (NestJS standalone via `createApplicationContext`): cria-ou-atualiza o
-     admin lendo `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`/`SEED_ADMIN_NAME` do env (senha **não**
-     fica no repo), hash via `HashingService`, garante `role` ⊇ `[admin]` e `situation='empregado'`.
-     Script npm `seed:admin`. Rodar 1x (local apontando p/ DB de prod, ou job no Render).
-- **Fase B — Trocar senha logado:** endpoint dedicado `PATCH /employees/change-password` que **valida a
-  senha atual** antes de trocar (mais seguro que o `update/self` atual) + tela no painel admin.
-- **Fase C — "Esqueci a senha" do admin:** generalizar `ResetPassword` para `Employee` (**migration**,
-  D4 — prod ativo) + serviço/rotas `POST /auth/employee/forgot-password` e `/auth/employee/reset-password`
-  + e-mail (reusa `emailService`) + UI "esqueci a senha" no login admin.
-- **Fase D — Reset por outro admin:** UI de gestão de funcionários (lista + resetar senha) sobre o
-  `PATCH /employees/update/admin/:id` já existente.
-
 ## 🔓 EM ABERTO (próximas sessões / decisão do dono)
 - **Fase 1d (schema/migration):** remover `PaymentConfirmation`, colunas de payment/refund/cancel em `Order`, enums `PaymentStatus`/`RefundReason`/valores de pagamento em `OrderStatus`. Hoje dormentes. Requer migration revisada (prod ativo, D4).
 - **Fluxo de pedido:** `OrdersController` segue 100% comentado → backend não cria/lista pedidos. Definir se o front cria pedido no backend (reativar controller) ou se ficou só no WhatsApp.
 - **Helper de transação (`RunInTransaction`):** introduzir junto da 1ª adoção real, migrando collaborators de `QueryRunner`→`EntityManager`.
-- **`product.service` de-AI (Fase 3):** ainda adiado; hoje o arquivo está legível (sem emojis), revisar comentários óbvios numa próxima passada.
-- **`GET /products/:id`:** não existe (front contorna achando na lista). Avaliar adicionar por eficiência.
-- **Lint:** `test/app.e2e-spec.ts` fora do `tsconfig` do typed-linting → 1 erro de parsing (tooling, não código). Incluir o `test/` no parserOptions ou ajustar o glob do lint.
 
 ---
 
@@ -217,5 +144,4 @@ acesso via **script de seed**; implementar as **três** formas de troca de senha
 | 2026-06-16 | Fase 0 + Fase 1 (código) | `src/checkout/*` (del), `email.service.ts`, `email.module.ts`, `email/templates/*` (del 9), `order.service.ts`, `interfaces/email-template.ts` (del) | Branch `refactor/backend-kiss`. Removido checkout órfão + emails/StockRelease mortos + dep circular. −2624 linhas, 21 arquivos. Build verde, testes ok. Schema (PaymentConfirmation/colunas) deixado dormente → Fase 1d (migration revisada). Commit `refactor: remove dead payment/checkout module`. |
 | 2026-06-16 | Fase 2 + Fase 3 (parcial) | `utils/error.util.ts`, `orders/order.service.ts`, `email/email.service.ts`, `refresh-tokens/refresh-token.service.ts`, `auth/auth.service.ts` | DRY: `SearchOrders`/`RequireUser` no order.service, `ErrorManagement: never`. De-AI: limpeza email + rename refresh + typo auth. Build verde, testes ok. `product.*` adiado (WIP do dono). Helper de transação adiado (sem adoção limpa). Convenção de commit: **Conventional Commits, curtos e diretos**. |
 | 2026-06-16 | WIP product + Fases 3→6 | `product.*` (WIP do dono commitada), todos os services/controllers (camelCase), `app.config`, `auth.*`, `email.*`, `nest-cli.json`, `main.ts`, `.prettierrc`, `README` | Commitada WIP do dono (fix rota price + busca por categoria). De-AI no product. **Fase 4** camelCase (métodos+utils). **Fase 5** bugs (products/auth + caminho de template e assets de email). **Fase 6** CSRF morto removido, parsing de env seguro, lint 0 erros (endOfLine auto), paginação mantida. Build/lint/testes verdes. Tudo comitado no branch `refactor/backend-kiss` (não pushado). |
-| 2026-06-17 | Push do branch + regras básicas | `REFACTOR-BACKEND.md` | Branch `refactor/backend-kiss` **publicado no GitHub** (backup, sem deploy — prod do backend é `master`, intacta). Adicionadas as regras básicas de sessão. |
-| 2026-06-17 | **Revisão do cadastro de produtos** (só leitura) | (leitura) | Auditado o fluxo `POST /products`: **código completo e correto** (DTO bate com o front, `images` eager, cookies cross-site ok, `ValidationPipe transform`). Pendências p/ funcionar em prod são de **ambiente/dados** (NODE_ENV=production no Render, CORS do domínio real, env Cloudinary, funcionário com `EDIT_PRODUCTS`) — ver seção REVISÃO. Build verde; lint com 1 erro de tooling (e2e fora do tsconfig). Nada codado. |
+
