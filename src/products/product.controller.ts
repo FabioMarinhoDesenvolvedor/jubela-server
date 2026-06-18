@@ -205,14 +205,14 @@ export class ProductsController {
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/name/:name')
-  FindByName(@Param('name') name: ProductFindByNameDTO) {
+  FindByName(@Param() name: ProductFindByNameDTO) {
     return this.productsService.FindByName(name);
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
   @Public()
   @Get('search/category/:category')
-  FindByRole(@Param('category') category: ProductFindByCategoryDTO) {
+  FindByRole(@Param() category: ProductFindByCategoryDTO) {
     return this.productsService.FindByCategory(category);
   }
 
