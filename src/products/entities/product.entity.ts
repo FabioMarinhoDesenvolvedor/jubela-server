@@ -28,6 +28,16 @@ export class Product {
   @Column({ type: 'numeric', precision: 10, scale: 2 })
   price: string;
 
+  // Preço promocional. Null = sem promoção. Quando definido, deve ser menor
+  // que `price` (regra validada no service). O produto é considerado "em
+  // promoção" enquanto promoPrice existir e promoEndsAt (se houver) for futuro.
+  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  promoPrice: string | null;
+
+  // Fim da promoção (opcional). Null = sem data de expiração.
+  @Column({ type: 'timestamptz', nullable: true })
+  promoEndsAt: Date | null;
+
   @OneToMany(() => ProductImages, (image) => image.product, {
     cascade: true,
     eager: true,

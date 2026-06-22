@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsDateString,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -86,4 +87,20 @@ export class CreateProductDTO {
     message: 'O campo "sku" deve estar em formato de texto',
   })
   readonly sku: string;
+
+  // Preço promocional opcional. Regras de negócio (menor que o preço,
+  // data futura) são validadas no service, que tem o preço efetivo.
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsDecimalString({
+    message: 'O campo "promoPrice" deve ser um string decimal ex: 59.99',
+  })
+  readonly promoPrice?: string;
+
+  @IsOptional()
+  @IsDateString(
+    {},
+    { message: 'O campo "promoEndsAt" deve ser uma data ISO válida' },
+  )
+  readonly promoEndsAt?: string;
 }

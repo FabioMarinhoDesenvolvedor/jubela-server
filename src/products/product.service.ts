@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UploadApiResponse } from 'cloudinary';
+import { Decimal } from 'decimal.js';
 import 'multer';
 import { TokenPayloadDTO } from 'src/auth/dto/token-payload.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -41,6 +42,52 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
+  /**
+   * Valida a coerência de uma promoção contra o preço efetivo do produto.
+   * Regras: preço promocional > 0, estritamente menor que o preço normal, e
+   * data de término (quando informada) no futuro. Data sem preço é incoerente.
+   */
+  private validatePromotion(
+    price: string,
+    promoPrice?: string | null,
+    promoEndsAt?: string | Date | null,
+  ): void {
+    if (promoPrice == null || promoPrice === '') {
+      if (promoEndsAt) {
+        throw new BadRequestException(
+          'Informe o preço promocional para definir a data de término da promoção',
+        );
+      }
+      return;
+    }
+
+    const promo = new Decimal(promoPrice);
+
+    if (promo.lte(0)) {
+      throw new BadRequestException(
+        'O preço promocional deve ser maior que zero',
+      );
+    }
+
+    if (promo.gte(new Decimal(price))) {
+      throw new BadRequestException(
+        'O preço promocional deve ser menor que o preço normal',
+      );
+    }
+
+    if (promoEndsAt) {
+      const ends = new Date(promoEndsAt);
+      if (Number.isNaN(ends.getTime())) {
+        throw new BadRequestException('Data de término da promoção inválida');
+      }
+      if (ends.getTime() <= Date.now()) {
+        throw new BadRequestException(
+          'A data de término da promoção deve ser no futuro',
+        );
+      }
+    }
+  }
+
   async create(
     createProductDTO: CreateProductDTO,
     files: Array<Express.Multer.File>,
@@ -53,6 +100,14 @@ export class ProductsService {
     if (!findEmployee) {
       throw new NotFoundException('Funcionário não encontrado');
     }
+
+    // Valida a promoção antes do upload para não deixar imagens órfãs no
+    // Cloudinary caso a regra de negócio reprove o cadastro.
+    this.validatePromotion(
+      createProductDTO.price,
+      createProductDTO.promoPrice,
+      createProductDTO.promoEndsAt,
+    );
 
     let uploadResults: UploadApiResponse[];
 
@@ -169,6 +224,19 @@ export class ProductsService {
         throw new NotFoundException('Produto não encontrado');
       }
 
+      // Valida a promoção contra o estado efetivo (campos do DTO sobrepõem os
+      // persistidos) para impedir promoção maior que o preço ou data passada.
+      const hasKey = (key: keyof UpdateProductDTO) => key in updateProductDTO;
+      this.validatePromotion(
+        hasKey('price') ? updateProductDTO.price : findProduct.price,
+        hasKey('promoPrice')
+          ? updateProductDTO.promoPrice
+          : findProduct.promoPrice,
+        hasKey('promoEndsAt')
+          ? updateProductDTO.promoEndsAt
+          : findProduct.promoEndsAt,
+      );
+
       if (file) {
         await this.replaceImage(findProduct, imageId, file, queryRunner);
         updatesPerformed.push('image');
@@ -220,6 +288,14 @@ export class ProductsService {
     if (!findProduct) {
       throw new NotFoundException('Produto não encontrado');
     }
+
+    // Mexer só no preço não pode quebrar uma promoção ativa (preço novo deve
+    // continuar maior que o preço promocional).
+    this.validatePromotion(
+      updateProductPriceDataDTO.price,
+      findProduct.promoPrice,
+      findProduct.promoEndsAt,
+    );
 
     const productUpdate = await this.productsRepository.preload({
       id,
