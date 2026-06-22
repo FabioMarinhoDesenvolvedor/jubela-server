@@ -126,9 +126,23 @@
 - [x] **Paginação `[total, ...rows]`:** decidido **manter** — controllers ativos (products/employees/users) e frontend dependem do formato. Mudança ficaria para um redesenho de contrato de API.
 - [x] Build + lint + testes verdes.
 
+### Fase 7 — Feature: Promoções por produto (2026-06-22)  `[~] CÓDIGO FEITO; migration pendente de run`
+> Pedido do dono (reunião). Front correspondente em `jubela-client` (Fase F). Decisão: promoção é
+> **flag de preço no próprio produto** (não entidade separada). "Em promoção" é **derivado** (preço
+> promo válido e não expirado) — sem booleano persistido, evitando estado inconsistente.
+- [x] Entidade `Product`: `promoPrice numeric(10,2) nullable` + `promoEndsAt timestamptz nullable`.
+- [x] `CreateProductDTO`: `promoPrice?` (IsDecimalString, trim) e `promoEndsAt?` (IsDateString). `UpdateProductDTO` herda via `PartialType`.
+- [x] **Regras de negócio no service** (`validatePromotion`, decimal.js): preço promo > 0 e **estritamente menor** que o preço normal; `promoEndsAt`, se houver, **no futuro**; data sem preço é rejeitada. Aplicada em `create` (**antes** do upload, p/ não deixar imagem órfã), `update` (estado efetivo = DTO sobrepõe persistido) e `updatePrice` (não pode baixar preço abaixo de promo ativa).
+- [x] Migration `migrations/1781000000000-AddProductPromotion.ts` (1ª do projeto): `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS`, idempotente; colunas nascem nulas (não toca dados existentes, D4).
+- [x] Build + testes verdes. Lint: arquivos da feature limpos (`eslint` exit 0). **Sem push.**
+- [ ] **PENDENTE (dono):** rodar `npm run migration:run` (dev) e `migration:run:prod` (prod) após revisão. Sem isso, `GET /products` não traz as colunas e o front nunca exibe promoção (degradação segura).
+
+> **⚠️ GOTCHA (lint):** `npm run lint` acusa 1 erro de **parsing em `test/app.e2e-spec.ts`** (`parserOptions.project` não inclui o arquivo) — **pré-existente e independente** desta feature (não tocamos em `test/`). Avaliar incluir `test/**` no tsconfig do ESLint numa sessão de hardening.
+
 ---
 
 ## 🔓 EM ABERTO (próximas sessões / decisão do dono)
+- **Fase 7 (promoções):** rodar a migration `AddProductPromotion` em dev e prod (D4, revisão do dono). Opcional futuro: tela de **edição** de produto no admin para criar/encerrar promoção depois do cadastro (hoje só há criação); o endpoint `PATCH /products` já valida a promoção.
 - **Fase 1d (schema/migration):** remover `PaymentConfirmation`, colunas de payment/refund/cancel em `Order`, enums `PaymentStatus`/`RefundReason`/valores de pagamento em `OrderStatus`. Hoje dormentes. Requer migration revisada (prod ativo, D4).
 - **Fluxo de pedido:** `OrdersController` segue 100% comentado → backend não cria/lista pedidos. Definir se o front cria pedido no backend (reativar controller) ou se ficou só no WhatsApp.
 - **Helper de transação (`RunInTransaction`):** introduzir junto da 1ª adoção real, migrando collaborators de `QueryRunner`→`EntityManager`.
@@ -143,5 +157,6 @@
 | 2026-06-16 | Diagnóstico + plano | (somente leitura) | Criado este guia. Decisões D1–D5 fixadas. Nada alterado em código. |
 | 2026-06-16 | Fase 0 + Fase 1 (código) | `src/checkout/*` (del), `email.service.ts`, `email.module.ts`, `email/templates/*` (del 9), `order.service.ts`, `interfaces/email-template.ts` (del) | Branch `refactor/backend-kiss`. Removido checkout órfão + emails/StockRelease mortos + dep circular. −2624 linhas, 21 arquivos. Build verde, testes ok. Schema (PaymentConfirmation/colunas) deixado dormente → Fase 1d (migration revisada). Commit `refactor: remove dead payment/checkout module`. |
 | 2026-06-16 | Fase 2 + Fase 3 (parcial) | `utils/error.util.ts`, `orders/order.service.ts`, `email/email.service.ts`, `refresh-tokens/refresh-token.service.ts`, `auth/auth.service.ts` | DRY: `SearchOrders`/`RequireUser` no order.service, `ErrorManagement: never`. De-AI: limpeza email + rename refresh + typo auth. Build verde, testes ok. `product.*` adiado (WIP do dono). Helper de transação adiado (sem adoção limpa). Convenção de commit: **Conventional Commits, curtos e diretos**. |
+| 2026-06-22 | **Fase 7 — Promoções por produto** | `products/entities/product.entity.ts`, `products/dto/create-product.dto.ts`, `products/product.service.ts`, `migrations/1781000000000-AddProductPromotion.ts` (novo) | Feature da reunião. Colunas `promoPrice`/`promoEndsAt` (nullable) + migration idempotente (1ª do projeto). DTO valida formato; service valida regra de negócio (`validatePromotion`, decimal.js): promo > 0, menor que o preço, data futura, sem-preço rejeitado; aplicada em create (antes do upload), update (estado efetivo) e updatePrice. Build + testes verdes; lint dos arquivos da feature limpo (erro de lint só no `test/app.e2e-spec.ts`, pré-existente). **Migration NÃO executada** (dono roda após revisão, D4). **Sem push.** |
 | 2026-06-16 | WIP product + Fases 3→6 | `product.*` (WIP do dono commitada), todos os services/controllers (camelCase), `app.config`, `auth.*`, `email.*`, `nest-cli.json`, `main.ts`, `.prettierrc`, `README` | Commitada WIP do dono (fix rota price + busca por categoria). De-AI no product. **Fase 4** camelCase (métodos+utils). **Fase 5** bugs (products/auth + caminho de template e assets de email). **Fase 6** CSRF morto removido, parsing de env seguro, lint 0 erros (endOfLine auto), paginação mantida. Build/lint/testes verdes. Tudo comitado no branch `refactor/backend-kiss` (não pushado). |
 
