@@ -42,18 +42,32 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
+  /** Promoção persistida ainda válida: tem preço e não expirou. */
+  private isStoredPromoActive(product: Product): boolean {
+    if (product.promoPrice == null) return false;
+    return (
+      !product.promoEndsAt ||
+      new Date(product.promoEndsAt).getTime() > Date.now()
+    );
+  }
+
   /**
    * Valida a coerência de uma promoção contra o preço efetivo do produto.
-   * Regras: preço promocional > 0, estritamente menor que o preço normal, e
-   * data de término (quando informada) no futuro. Data sem preço é incoerente.
+   * Regras: preço promocional > 0 e estritamente menor que o preço normal.
+   * A regra de "data no futuro" (e "data sem preço") só se aplica quando a
+   * promoção está sendo criada/alterada (`enforceFutureDate`), evitando
+   * bloquear uma simples mudança de preço por causa de uma promo já expirada.
    */
   private validatePromotion(
     price: string,
     promoPrice?: string | null,
     promoEndsAt?: string | Date | null,
+    options: { enforceFutureDate?: boolean } = {},
   ): void {
+    const { enforceFutureDate = true } = options;
+
     if (promoPrice == null || promoPrice === '') {
-      if (promoEndsAt) {
+      if (promoEndsAt && enforceFutureDate) {
         throw new BadRequestException(
           'Informe o preço promocional para definir a data de término da promoção',
         );
@@ -75,7 +89,7 @@ export class ProductsService {
       );
     }
 
-    if (promoEndsAt) {
+    if (promoEndsAt && enforceFutureDate) {
       const ends = new Date(promoEndsAt);
       if (Number.isNaN(ends.getTime())) {
         throw new BadRequestException('Data de término da promoção inválida');
@@ -225,17 +239,22 @@ export class ProductsService {
       }
 
       // Valida a promoção contra o estado efetivo (campos do DTO sobrepõem os
-      // persistidos) para impedir promoção maior que o preço ou data passada.
+      // persistidos). A data-futura só é exigida quando a promoção em si está
+      // sendo alterada; mudar só o preço não deve esbarrar numa promo expirada.
       const hasKey = (key: keyof UpdateProductDTO) => key in updateProductDTO;
-      this.validatePromotion(
-        hasKey('price') ? updateProductDTO.price : findProduct.price,
-        hasKey('promoPrice')
-          ? updateProductDTO.promoPrice
-          : findProduct.promoPrice,
-        hasKey('promoEndsAt')
-          ? updateProductDTO.promoEndsAt
-          : findProduct.promoEndsAt,
-      );
+      const touchingPromo = hasKey('promoPrice') || hasKey('promoEndsAt');
+      if (touchingPromo || this.isStoredPromoActive(findProduct)) {
+        this.validatePromotion(
+          hasKey('price') ? updateProductDTO.price : findProduct.price,
+          hasKey('promoPrice')
+            ? updateProductDTO.promoPrice
+            : findProduct.promoPrice,
+          hasKey('promoEndsAt')
+            ? updateProductDTO.promoEndsAt
+            : findProduct.promoEndsAt,
+          { enforceFutureDate: touchingPromo },
+        );
+      }
 
       if (file) {
         await this.replaceImage(findProduct, imageId, file, queryRunner);
@@ -289,13 +308,16 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Mexer só no preço não pode quebrar uma promoção ativa (preço novo deve
-    // continuar maior que o preço promocional).
-    this.validatePromotion(
-      updateProductPriceDataDTO.price,
-      findProduct.promoPrice,
-      findProduct.promoEndsAt,
-    );
+    // Mexer só no preço não pode quebrar uma promoção ATIVA (preço novo deve
+    // continuar maior que o preço promocional). Promo expirada é ignorada.
+    if (this.isStoredPromoActive(findProduct)) {
+      this.validatePromotion(
+        updateProductPriceDataDTO.price,
+        findProduct.promoPrice,
+        findProduct.promoEndsAt,
+        { enforceFutureDate: false },
+      );
+    }
 
     const productUpdate = await this.productsRepository.preload({
       id,
