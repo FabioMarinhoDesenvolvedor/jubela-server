@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -27,6 +28,17 @@ import { AppService } from './app.service';
       imports: [ConfigModule.forFeature(appConfig)],
       inject: [appConfig.KEY],
       useFactory: async (appConfigParam: ConfigType<typeof appConfig>) => {
+        // O app sempre roda compilado a partir de dist/ (tanto `start:dev`
+        // quanto `start:prod` do Nest), e as migrations são compiladas para
+        // dist/migrations/*.js. __dirname aqui é dist/src/app → sobe 2 níveis.
+        const migrationsGlob = join(
+          __dirname,
+          '..',
+          '..',
+          'migrations',
+          '*.js',
+        );
+
         return {
           type: 'postgres',
           host: appConfigParam.host,
@@ -36,6 +48,14 @@ import { AppService } from './app.service';
           password: appConfigParam.password,
           autoLoadEntities: appConfigParam.autoLoadEntities,
           synchronize: appConfigParam.synchronize,
+          // Roda migrations pendentes automaticamente na subida do app,
+          // garantindo que colunas novas (ex.: promoção) existam no deploy.
+          // Controlável por env (default LIGADO). Desligue com
+          // DATABASE_MIGRATIONS_RUN=false se precisar subir sem migrar — ex.:
+          // banco novo, cuja cadeia histórica não roda do zero (algumas
+          // migrations assumem colunas criadas por synchronize).
+          migrations: [migrationsGlob],
+          migrationsRun: process.env.DATABASE_MIGRATIONS_RUN !== 'false',
         };
       },
     }),

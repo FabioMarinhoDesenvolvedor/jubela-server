@@ -80,13 +80,13 @@ export class CreateProductDTO {
   })
   readonly lowStock?: number;
 
-  @IsNotEmpty({
-    message: 'Campo "sku" não preenchido',
-  })
+  // SKU opcional: se não for informado, o service gera um automaticamente.
+  // (A coluna no banco é NOT NULL, então nunca fica vazia.)
+  @IsOptional()
   @IsString({
     message: 'O campo "sku" deve estar em formato de texto',
   })
-  readonly sku: string;
+  readonly sku?: string;
 
   // Preço promocional opcional. Regras de negócio (menor que o preço,
   // data futura) são validadas no service, que tem o preço efetivo.

@@ -42,6 +42,13 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
+  /** Gera um SKU único quando o cadastro não informa um. */
+  private generateSku(): string {
+    const time = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `JUB-${time}-${rand}`;
+  }
+
   /** Promoção persistida ainda válida: tem preço e não expirou. */
   private isStoredPromoActive(product: Product): boolean {
     if (product.promoPrice == null) return false;
@@ -156,6 +163,9 @@ export class ProductsService {
 
       const createProductData = {
         ...createProductDTO,
+        // SKU é opcional no cadastro; gera um identificador único quando ausente
+        // (coluna NOT NULL no banco). Formato: JUB-<base36 do tempo>-<aleatório>.
+        sku: createProductDTO.sku?.trim() || this.generateSku(),
         employee: findEmployee,
       };
 
