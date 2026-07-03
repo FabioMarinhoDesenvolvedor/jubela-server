@@ -166,6 +166,8 @@ export class ProductsService {
         // SKU é opcional no cadastro; gera um identificador único quando ausente
         // (coluna NOT NULL no banco). Formato: JUB-<base36 do tempo>-<aleatório>.
         sku: createProductDTO.sku?.trim() || this.generateSku(),
+        // Estoque opcional (loja não controla estoque); coluna é NOT NULL.
+        quantity: createProductDTO.quantity ?? 0,
         employee: findEmployee,
       };
 

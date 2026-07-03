@@ -56,17 +56,21 @@ export class CreateProductDTO {
   })
   readonly price: string;
 
-  @IsNotEmpty({
-    message: 'Campo "quantidade" não preenchido',
-  })
-  @Transform(({ value }) => parseInt(value, 10))
+  // Estoque opcional: a loja não controla estoque. Quando ausente, o service
+  // grava 0 (coluna NOT NULL no banco) e nenhum fluxo trata esse valor.
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === ''
+      ? undefined
+      : parseInt(value, 10),
+  )
   @IsInt({
     message: 'Campo "quantidade" deve ser um número inteiro positivo',
   })
   @IsPositive({
     message: 'Campo "quantidade" deve ser um número inteiro positivo',
   })
-  readonly quantity: number;
+  readonly quantity?: number;
 
   @IsOptional()
   @IsInt({

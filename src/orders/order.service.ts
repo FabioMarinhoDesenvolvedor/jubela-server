@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -56,7 +54,6 @@ export class OrdersService {
     let findUser: User;
     let newOrderData: Order;
     let findProduct: Product;
-    let sendEmail = false;
     const itemsFromThisOrder: Items[] = [];
 
     try {
@@ -93,7 +90,6 @@ export class OrdersService {
             id: createOrderItemDTO[i].product,
           },
           loadEagerRelations: false,
-          lock: { mode: 'pessimistic_write' },
         });
 
         if (!findProduct) {
@@ -109,42 +105,7 @@ export class OrdersService {
           product: findProduct,
         };
 
-        const { quantity, lowStock } = findProduct;
-
-        switch (true) {
-          case quantity < 1:
-            throw new BadRequestException(
-              `Produto ${findProduct.name} esgotado`,
-            );
-
-          case createOrderItemDTO[i].quantity > quantity:
-            throw new BadRequestException(
-              `Estoque do produto  ${findProduct.name} insuficiente`,
-            );
-
-          case quantity <= lowStock &&
-            quantity >= createOrderItemDTO[i].quantity:
-            sendEmail = true;
-            break;
-        }
-
-        const quantityUpdate =
-          findProduct.quantity - createOrderItemDTO[i].quantity;
-
-        const productQuantityUpdate = await queryRunner.manager.update(
-          Product,
-          findProduct.id,
-          {
-            quantity: quantityUpdate,
-          },
-        );
-
-        if (!productQuantityUpdate || productQuantityUpdate.affected < 1) {
-          throw new InternalServerErrorException(
-            `Erro ao atualizar quantidade do produto ${createOrderItemDTO[i].product_name}`,
-          );
-        }
-
+        // Estoque não é verificado nem descontado: a loja vende sob demanda.
         const orderItemCreate = queryRunner.manager.create(Items, itemData);
 
         itemsFromThisOrder.push(orderItemCreate);
@@ -153,8 +114,6 @@ export class OrdersService {
       await queryRunner.manager.save(Items, itemsFromThisOrder);
 
       await queryRunner.commitTransaction();
-
-      if (sendEmail === true) await this.emailService.lowStockWarn(findProduct);
 
       const createPreferenceObject =
         this.returnItemsIPObject(itemsFromThisOrder);
