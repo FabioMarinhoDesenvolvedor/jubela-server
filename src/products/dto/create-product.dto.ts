@@ -33,16 +33,14 @@ export class CreateProductDTO {
   })
   readonly category: string;
 
-  @IsNotEmpty({
-    message: 'Campo "descrição" não preenchido',
-  })
+  @IsOptional()
   @IsString({
     message: 'O campo "descrição" deve estar no formato de texto',
   })
-  @Length(10, 500, {
-    message: 'O campo descrição deve ter o comprimento máximo de 500',
+  @Length(10, 1000, {
+    message: 'O campo descrição deve ter o comprimento máximo de 1000',
   })
-  readonly description: string;
+  readonly description?: string;
 
   @IsNotEmpty({
     message: 'Campo "preço" não preenchido',
