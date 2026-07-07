@@ -32,8 +32,6 @@ async function bootstrap() {
 
   const allowedOrigins = [
     'https://jubela-client.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
   ];
 
   const isDevelopment = process.env.NODE_ENV === 'development';
