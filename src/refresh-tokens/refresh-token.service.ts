@@ -16,7 +16,7 @@ import { EmailService } from 'src/email/email.service';
 import { Employee } from 'src/employees/entities/employee.entity';
 import { LogsService } from 'src/logs-register/log.service';
 import { User } from 'src/users/entities/user.entity';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { RefreshTokenEmployee } from './entities/refresh-token-employee.entity';
 import { RefreshTokenUser } from './entities/refresh-token-user.entity';
@@ -45,7 +45,7 @@ export class RefreshTokensService {
     private dataSource: DataSource,
   ) {}
 
-  async CreateEmployee(sub: Employee, queryRunnerSub: QueryRunner) {
+  async createEmployee(sub: Employee, queryRunnerSub: QueryRunner) {
     const rtData = {
       is_valid: true,
       employee: sub,
@@ -66,7 +66,7 @@ export class RefreshTokensService {
     };
   }
 
-  async CreateUser(sub: User, queryRunnerSub: QueryRunner) {
+  async createUser(sub: User, queryRunnerSub: QueryRunner) {
     const rtData = {
       is_valid: true,
       user: sub,
@@ -81,7 +81,7 @@ export class RefreshTokensService {
     };
   }
 
-  async RevokeAllEmployee(sub: Employee, isLogout: boolean, tokenId?: string) {
+  async revokeAllEmployee(sub: Employee, isLogout: boolean, tokenId?: string) {
     try {
       const revoke = await this.RTEmployeeRepository.update(
         { employee: { id: sub.id } },
@@ -125,12 +125,12 @@ export class RefreshTokensService {
         occurredAt: `${day}/${month}/${year} - ${hourString}`,
       };
 
-      await this.emailsService.SendRTAlertEmployees(alertData, true);
-      await this.emailsService.SendRTAlertEmployees(alertData, false);
+      await this.emailsService.sendRTAlertEmployees(alertData, true);
+      await this.emailsService.sendRTAlertEmployees(alertData, false);
 
       throw new Error('Acessos revogados, contate o suporte');
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.UNAUTHORIZED, {
+      errorManagement(error, GeneralErrorType.UNAUTHORIZED, {
         logger: 'Erro no revokeAllEmployee',
         queryFailedError: 'Erro nos registros durante revogação',
         internalServerError: 'Erro interno ao revogar tokens de funcionário',
@@ -139,7 +139,7 @@ export class RefreshTokensService {
     }
   }
 
-  async RevokeAllUser(sub: User, isLogout: boolean, tokenId?: string) {
+  async revokeAllUser(sub: User, isLogout: boolean, tokenId?: string) {
     try {
       const findAllUserRT = await this.RTUserRepository.find({
         where: {
@@ -190,12 +190,12 @@ export class RefreshTokensService {
         loginUrl: 'https://jubela-client.vercel.app/login',
       };
 
-      await this.emailsService.SendRTAlertUsers(alertData, true);
-      await this.emailsService.SendRTAlertUsers(alertData, false);
+      await this.emailsService.sendRTAlertUsers(alertData, true);
+      await this.emailsService.sendRTAlertUsers(alertData, false);
 
       throw new Error('Acessos revogados, contate o suporte');
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.UNAUTHORIZED, {
+      errorManagement(error, GeneralErrorType.UNAUTHORIZED, {
         logger: 'Erro no revokeAllUser',
         queryFailedError: 'Erro nos registros durante revogação',
         internalServerError: 'Erro interno ao revogar tokens de usuário',
@@ -204,7 +204,7 @@ export class RefreshTokensService {
     }
   }
 
-  async RefreshTokensEmployee(refreshToken: string) {
+  async refreshTokensEmployee(refreshToken: string) {
     const { sub, id } = await this.jwtService.verifyAsync(
       refreshToken,
       this.jwtConfiguration,
@@ -222,12 +222,12 @@ export class RefreshTokensService {
       throw new Error('Funcionário não encontrado ou inativo');
     }
 
-    const create = await this.CreateTokensEmployee(findEmployee, id);
+    const create = await this.createTokensEmployee(findEmployee, id);
 
     return create;
   }
 
-  async RefreshTokensUser(refreshToken: string) {
+  async refreshTokensUser(refreshToken: string) {
     const { sub, id } = await this.jwtService.verifyAsync(
       refreshToken,
       this.jwtConfiguration,
@@ -242,12 +242,12 @@ export class RefreshTokensService {
       throw new Error('Usuário não encontrado');
     }
 
-    const create = await this.CreateTokensUser(findUser, id);
+    const create = await this.createTokensUser(findUser, id);
 
     return create;
   }
 
-  async CreateTokensEmployee(
+  async createTokensEmployee(
     employeeData: Employee,
     refreshTokenIdIncoming: string,
   ) {
@@ -259,16 +259,13 @@ export class RefreshTokensService {
     let refreshToken: string = '';
 
     try {
-      const doesEmployeeReallyExists = await queryRunner.manager.findOne(
-        Employee,
-        {
-          where: {
-            id: employeeData.id,
-          },
+      const employee = await queryRunner.manager.findOne(Employee, {
+        where: {
+          id: employeeData.id,
         },
-      );
+      });
 
-      if (!doesEmployeeReallyExists) {
+      if (!employee) {
         throw new UnauthorizedException('Funcionário não encontrado');
       }
 
@@ -282,26 +279,26 @@ export class RefreshTokensService {
             AND is_valid = true
           RETURNING *
         `,
-          [refreshTokenIdIncoming, doesEmployeeReallyExists.id],
+          [refreshTokenIdIncoming, employee.id],
         );
 
       if (!updateToken) {
-        await this.RevokeAllEmployee(doesEmployeeReallyExists, false);
+        await this.revokeAllEmployee(employee, false);
 
         throw new UnauthorizedException(
           'Refresh token inválido ou já utilizado',
         );
       }
 
-      const create = await this.CreateEmployee(employeeData, queryRunner);
+      const create = await this.createEmployee(employeeData, queryRunner);
 
-      accessToken = await this.SignJwtAsync(
+      accessToken = await this.signJwtAsync(
         employeeData.id,
         this.jwtConfiguration.jwtTtl,
         { email: employeeData.email, role: employeeData.role },
       );
 
-      refreshToken = await this.SignJwtAsync(
+      refreshToken = await this.signJwtAsync(
         employeeData.id,
         this.jwtConfiguration.jwtRefreshTtl,
         { id: create.token_id, role: employeeData.role },
@@ -313,7 +310,7 @@ export class RefreshTokensService {
         employee: employeeData,
       };
 
-      await this.logsService.CreateLogEmployee(dataForLog, queryRunner);
+      await this.logsService.createLogEmployee(dataForLog, queryRunner);
 
       await queryRunner.commitTransaction();
 
@@ -324,7 +321,7 @@ export class RefreshTokensService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao criar novo par de tokens',
         queryFailedError: 'Erro nos registros de re-autenticação',
         internalServerError: 'Erro interno ao criar novo par de tokens',
@@ -335,7 +332,7 @@ export class RefreshTokensService {
     }
   }
 
-  async CreateTokensUser(userData: User, refreshTokenIdIncoming: string) {
+  async createTokensUser(userData: User, refreshTokenIdIncoming: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -344,13 +341,13 @@ export class RefreshTokensService {
     let refreshToken: string = '';
 
     try {
-      const doesUserReallyExists = await queryRunner.manager.findOne(User, {
+      const user = await queryRunner.manager.findOne(User, {
         where: {
           id: userData.id,
         },
       });
 
-      if (!doesUserReallyExists) {
+      if (!user) {
         throw new UnauthorizedException('Usuário não encontrado');
       }
 
@@ -363,26 +360,26 @@ export class RefreshTokensService {
             AND is_valid = true
           RETURNING *
         `,
-        [refreshTokenIdIncoming, doesUserReallyExists.id],
+        [refreshTokenIdIncoming, user.id],
       );
 
       if (!updateToken) {
-        await this.RevokeAllUser(doesUserReallyExists, false);
+        await this.revokeAllUser(user, false);
 
         throw new UnauthorizedException(
           'Refresh token inválido ou já utilizado',
         );
       }
 
-      const create = await this.CreateUser(userData, queryRunner);
+      const create = await this.createUser(userData, queryRunner);
 
-      accessToken = await this.SignJwtAsync(
+      accessToken = await this.signJwtAsync(
         userData.id,
         this.jwtConfiguration.jwtTtl,
         { email: userData.email },
       );
 
-      refreshToken = await this.SignJwtAsync(
+      refreshToken = await this.signJwtAsync(
         userData.id,
         this.jwtConfiguration.jwtRefreshTtl,
         { id: create.token_id },
@@ -394,7 +391,7 @@ export class RefreshTokensService {
         user: userData,
       };
 
-      await this.logsService.CreateLogUser(dataForLog, queryRunner);
+      await this.logsService.createLogUser(dataForLog, queryRunner);
 
       await queryRunner.commitTransaction();
 
@@ -405,7 +402,7 @@ export class RefreshTokensService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao criar novo par de tokens',
         queryFailedError: 'Erro nos registros de re-autenticação',
         internalServerError: 'Erro interno ao criar novo par de tokens',
@@ -416,7 +413,7 @@ export class RefreshTokensService {
     }
   }
 
-  async SignJwtAsync<T>(sub: string, expiresIn: number, payload?: T) {
+  async signJwtAsync<T>(sub: string, expiresIn: number, payload?: T) {
     return await this.jwtService.signAsync(
       {
         sub,

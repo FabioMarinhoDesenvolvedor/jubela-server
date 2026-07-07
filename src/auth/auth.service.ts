@@ -22,7 +22,7 @@ import { ResetPasswordDTO } from 'src/users/dto/reset-password.dto';
 import { ResetPassword } from 'src/users/entities/reset-password.entity';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/user.service';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { DataSource, MoreThan, Repository } from 'typeorm';
 import { JWTBlacklist } from '../jwt-blacklist/entities/jwt_blacklist.entity';
 import jwtConfig from './config/jwt.config';
@@ -59,7 +59,7 @@ export class AuthService {
     private dataSource: DataSource,
   ) {}
 
-  async LoginEmployee(loginDTO: LoginDTO) {
+  async loginEmployee(loginDTO: LoginDTO) {
     const findEmployee = await this.employeeRepository.findOneBy({
       email: loginDTO.email,
       situation: EmployeeSituation.EMPLOYED,
@@ -69,7 +69,7 @@ export class AuthService {
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
-    const passwordCompare = await this.hashingService.Compare(
+    const passwordCompare = await this.hashingService.compare(
       loginDTO.password,
       findEmployee.password_hash,
     );
@@ -78,12 +78,12 @@ export class AuthService {
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
-    const create = await this.CreateTokensEmployee(findEmployee);
+    const create = await this.createTokensEmployee(findEmployee);
 
     return create;
   }
 
-  async LoginUser(loginDTO: LoginDTO) {
+  async loginUser(loginDTO: LoginDTO) {
     const findUser = await this.userRepository.findOneBy({
       email: loginDTO.email,
     });
@@ -92,7 +92,7 @@ export class AuthService {
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
-    const passwordCompare = await this.hashingService.Compare(
+    const passwordCompare = await this.hashingService.compare(
       loginDTO.password,
       findUser.password_hash,
     );
@@ -101,12 +101,12 @@ export class AuthService {
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
-    const create = await this.CreateTokensUser(findUser);
+    const create = await this.createTokensUser(findUser);
 
     return create;
   }
 
-  async Register(loginUserDTO: LoginUserDTO) {
+  async register(loginUserDTO: LoginUserDTO) {
     let user: User;
 
     await this.dataSource.transaction(async (manager) => {
@@ -119,7 +119,7 @@ export class AuthService {
         throw new BadRequestException('Usuário já existe');
       }
 
-      const password_hash = await this.hashingService.Hash(
+      const password_hash = await this.hashingService.hash(
         loginUserDTO.password,
       );
 
@@ -134,12 +134,12 @@ export class AuthService {
       user = await manager.save(User, userCreate);
     });
 
-    const create = await this.CreateTokensUser(user);
+    const create = await this.createTokensUser(user);
 
     return create;
   }
 
-  async ResetPassword(resetPasswordDTO: ResetPasswordDTO) {
+  async resetPassword(resetPasswordDTO: ResetPasswordDTO) {
     const { email } = resetPasswordDTO;
 
     const findUser = await this.userRepository.findOne({
@@ -168,10 +168,10 @@ export class AuthService {
 
     await this.resetPasswordRepository.save(newResetPasswordAttempt);
 
-    return this.emailsService.ResetPassword(email, newToken);
+    return this.emailsService.resetPassword(email, newToken);
   }
 
-  async UpdatePassword(updatePasswordDTO: UpdatePasswordDTO) {
+  async updatePassword(updatePasswordDTO: UpdatePasswordDTO) {
     const { token } = updatePasswordDTO;
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -192,13 +192,11 @@ export class AuthService {
         },
       );
 
-      this.logger.log(findResetPassAttemptRegister);
-
       if (!findResetPassAttemptRegister) {
         throw new BadRequestException('Token inválido ou expirado');
       }
 
-      const updatedPassword = await this.hashingService.Hash(
+      const updatedPassword = await this.hashingService.hash(
         updatePasswordDTO.newPassword,
       );
 
@@ -255,7 +253,7 @@ export class AuthService {
     };
   }
 
-  async LogoutEmployee(logoutDto: LogoutDTO) {
+  async logoutEmployee(logoutDto: LogoutDTO) {
     const jwtBlacklistData = {
       email: logoutDto.email,
       token: logoutDto.token,
@@ -267,7 +265,7 @@ export class AuthService {
       },
     });
 
-    await this.refreshTokenService.RevokeAllEmployee(findEmployee, true);
+    await this.refreshTokenService.revokeAllEmployee(findEmployee, true);
 
     const createLogout = this.jwtBlacklistRepository.create(jwtBlacklistData);
 
@@ -277,10 +275,10 @@ export class AuthService {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
-    return 'Logout criado com suceso';
+    return 'Logout criado com sucesso';
   }
 
-  async LogoutUser(logoutDto: LogoutDTO) {
+  async logoutUser(logoutDto: LogoutDTO) {
     const jwtBlacklistData = {
       email: logoutDto.email,
       token: logoutDto.token,
@@ -292,7 +290,7 @@ export class AuthService {
       },
     });
 
-    await this.refreshTokenService.RevokeAllUser(findUser, true);
+    await this.refreshTokenService.revokeAllUser(findUser, true);
 
     const createLogout = this.jwtBlacklistRepository.create(jwtBlacklistData);
 
@@ -302,10 +300,10 @@ export class AuthService {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
-    return 'Logout criado com suceso';
+    return 'Logout criado com sucesso';
   }
 
-  async CreateTokensEmployee(employeeData: Employee) {
+  async createTokensEmployee(employeeData: Employee) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -314,18 +312,18 @@ export class AuthService {
     let refreshToken: string = '';
 
     try {
-      const createToken = await this.refreshTokenService.CreateEmployee(
+      const createToken = await this.refreshTokenService.createEmployee(
         employeeData,
         queryRunner,
       );
 
-      accessToken = await this.SignJwtAsync(
+      accessToken = await this.signJwtAsync(
         employeeData.id,
         this.jwtConfiguration.jwtTtl,
         { email: employeeData.email, role: employeeData.role },
       );
 
-      refreshToken = await this.SignJwtAsync(
+      refreshToken = await this.signJwtAsync(
         employeeData.id,
         this.jwtConfiguration.jwtRefreshTtl,
         { id: createToken.token_id },
@@ -337,7 +335,7 @@ export class AuthService {
         employee: employeeData,
       };
 
-      await this.logService.CreateLogEmployee(dataForLog, queryRunner);
+      await this.logService.createLogEmployee(dataForLog, queryRunner);
 
       await queryRunner.commitTransaction();
 
@@ -352,7 +350,7 @@ export class AuthService {
       await queryRunner.rollbackTransaction();
 
       try {
-        await this.emailsService.LogIssue('funcionário');
+        await this.emailsService.logIssue('funcionário');
       } catch (emailErr) {
         this.logger.error(
           'Falha ao enviar e-mail de alerta de erro de autenticação',
@@ -360,7 +358,7 @@ export class AuthService {
         );
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao criar novo par de tokens',
         queryFailedError: 'Erro nos registros de autenticação',
         internalServerError: 'Erro interno ao criar novo par de tokens',
@@ -371,7 +369,7 @@ export class AuthService {
     }
   }
 
-  async CreateTokensUser(user: User) {
+  async createTokensUser(user: User) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -380,18 +378,18 @@ export class AuthService {
     let refreshToken: string = '';
 
     try {
-      const createToken = await this.refreshTokenService.CreateUser(
+      const createToken = await this.refreshTokenService.createUser(
         user,
         queryRunner,
       );
 
-      accessToken = await this.SignJwtAsync<Partial<User>>(
+      accessToken = await this.signJwtAsync<Partial<User>>(
         user.id,
         this.jwtConfiguration.jwtTtl,
         { email: user.email },
       );
 
-      refreshToken = await this.SignJwtAsync<Partial<User>>(
+      refreshToken = await this.signJwtAsync<Partial<User>>(
         user.id,
         this.jwtConfiguration.jwtRefreshTtl,
         { id: createToken.token_id },
@@ -403,7 +401,7 @@ export class AuthService {
         user: user,
       };
 
-      await this.logService.CreateLogUser(dataForLog, queryRunner);
+      await this.logService.createLogUser(dataForLog, queryRunner);
 
       await queryRunner.commitTransaction();
 
@@ -417,27 +415,27 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
-        logger: 'Erro ao criar novo par de tokens',
-        queryFailedError: 'Erro nos registros de autenticação',
-        internalServerError: 'Erro interno ao criar novo par de tokens',
-        generalError: 'Falha ao processar transação da autenticação',
-      });
-
       try {
-        await this.emailsService.LogIssue('usuário');
+        await this.emailsService.logIssue('usuário');
       } catch (emailErr) {
         this.logger.error(
           'Falha ao enviar e-mail de alerta de erro de autenticação',
           emailErr,
         );
       }
+
+      errorManagement(error, GeneralErrorType.INTERNAL, {
+        logger: 'Erro ao criar novo par de tokens',
+        queryFailedError: 'Erro nos registros de autenticação',
+        internalServerError: 'Erro interno ao criar novo par de tokens',
+        generalError: 'Falha ao processar transação da autenticação',
+      });
     } finally {
       await queryRunner.release();
     }
   }
 
-  async SignJwtAsync<T>(sub: string, expiresIn: number, payload?: T) {
+  async signJwtAsync<T>(sub: string, expiresIn: number, payload?: T) {
     return await this.jwtService.signAsync(
       {
         sub,
@@ -452,8 +450,8 @@ export class AuthService {
     );
   }
 
-  async ValidateGoogleUser(googleUser: CreateUserDTO) {
-    const createUser = await this.userService.FindByEmailForGoogle(
+  async validateGoogleUser(googleUser: CreateUserDTO) {
+    const createUser = await this.userService.findByEmailForGoogle(
       googleUser.email,
     );
 
@@ -467,6 +465,6 @@ export class AuthService {
       }
     }
 
-    return await this.userService.Create(googleUser);
+    return await this.userService.create(googleUser);
   }
 }

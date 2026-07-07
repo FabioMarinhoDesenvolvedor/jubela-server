@@ -13,7 +13,7 @@ import { Request } from 'express';
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { RefreshTokenEmployee } from 'src/refresh-tokens/entities/refresh-token-employee.entity';
 import { RefreshTokenUser } from 'src/refresh-tokens/entities/refresh-token-user.entity';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { Repository } from 'typeorm';
 import jwtConfig from '../config/jwt.config';
 
@@ -49,13 +49,13 @@ export class RefreshTokenGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof TokenExpiredError) {
-        await this.InvalidateExpiredToken(token);
+        await this.invalidateExpiredToken(token);
         throw new UnauthorizedException(
           'Sessão expirada, faça login novamente',
         );
       }
 
-      ErrorManagement(error, GeneralErrorType.UNAUTHORIZED, {
+      errorManagement(error, GeneralErrorType.UNAUTHORIZED, {
         logger: 'RefreshTokenError:',
         queryFailedError: 'Erro na busca de dados para re-autenticação',
         internalServerError: 'Erro interno ao realizar re-autenticação',
@@ -64,7 +64,7 @@ export class RefreshTokenGuard implements CanActivate {
     }
   }
 
-  ExtractTokenFromHeader(request: Request): string | undefined {
+  extractTokenFromHeader(request: Request): string | undefined {
     const refreshToken = request.body.refreshToken;
 
     if (!refreshToken || typeof refreshToken !== 'string') return;
@@ -72,7 +72,7 @@ export class RefreshTokenGuard implements CanActivate {
     return refreshToken;
   }
 
-  private ExtractTokenData(token: string) {
+  private extractTokenData(token: string) {
     const payload = this.jwtService.decode(token) as {
       id?: string;
       sub?: string;
@@ -84,9 +84,9 @@ export class RefreshTokenGuard implements CanActivate {
     return payload;
   }
 
-  private async InvalidateExpiredToken(token: string): Promise<void> {
+  private async invalidateExpiredToken(token: string): Promise<void> {
     try {
-      const extractedData = this.ExtractTokenData(token);
+      const extractedData = this.extractTokenData(token);
 
       if (extractedData) {
         const { role, id } = extractedData;
@@ -114,7 +114,7 @@ export class RefreshTokenGuard implements CanActivate {
         }
       }
     } catch (err) {
-      ErrorManagement(err, GeneralErrorType.INTERNAL, {
+      errorManagement(err, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao invalidar token',
         queryFailedError: 'Erro na atualização de dados de token',
         internalServerError: 'Erro interno ao invalidar token',

@@ -8,8 +8,8 @@ export default registerAs('app', () => {
     username: process.env.DATABASE_USERNAME,
     database: process.env.DATABASE_NAME,
     password: process.env.DATABASE_PASSWORD,
-    autoLoadEntities: Boolean(process.env.DATABASE_AUTOLOADENTITIES),
-    synchronize: Boolean(process.env.DATABASE_SYNCHRONIZE),
+    autoLoadEntities: process.env.DATABASE_AUTOLOADENTITIES === 'true',
+    synchronize: process.env.DATABASE_SYNCHRONIZE === 'true',
   };
   return database;
 });

@@ -3,7 +3,7 @@ import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class CloudinaryService {
-  private UploadSingleFile(
+  private uploadSingleFile(
     file: Express.Multer.File,
     folder: string,
   ): Promise<UploadApiResponse> {
@@ -38,16 +38,16 @@ export class CloudinaryService {
     });
   }
 
-  async UploadMultipleImages(
+  async uploadMultipleImages(
     files: Express.Multer.File[],
     folder: string = 'uploads',
   ): Promise<UploadApiResponse[]> {
     return Promise.all(
-      files.map((file) => this.UploadSingleFile(file, folder)),
+      files.map((file) => this.uploadSingleFile(file, folder)),
     );
   }
 
-  async DeleteMultipleImages(publicIds: string[]): Promise<any> {
+  async deleteMultipleImages(publicIds: string[]): Promise<any> {
     if (!publicIds || publicIds.length === 0) {
       throw new BadRequestException('Nenhuma imagem enviada para excluir');
     }
@@ -60,7 +60,7 @@ export class CloudinaryService {
   }
 
   // Útil para extrair o public_id de uma URL do Cloudinary
-  ExtractPublicId(url: string): string {
+  extractPublicId(url: string): string {
     const parts = url.split('/');
     const filename = parts[parts.length - 1];
     const publicId = filename.split('.')[0];

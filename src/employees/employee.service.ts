@@ -26,8 +26,8 @@ export class EmployeesService {
     private readonly hashingService: HashingServiceProtocol,
   ) {}
 
-  async Create(createEmployeeDTO: CreateEmployeeDTO) {
-    const password_hash = await this.hashingService.Hash(
+  async create(createEmployeeDTO: CreateEmployeeDTO) {
+    const password_hash = await this.hashingService.hash(
       createEmployeeDTO.password,
     );
 
@@ -61,7 +61,7 @@ export class EmployeesService {
     };
   }
 
-  async UpdateSelf(
+  async updateSelf(
     employeeIdDTO: UrlUuidDTO,
     updateEmployeeDTO: UpdateEmployeeDTO,
     tokenPayloadDTO: TokenPayloadDTO,
@@ -79,7 +79,7 @@ export class EmployeesService {
     }
 
     if (updateEmployeeDTO?.password) {
-      const passwordHash = await this.hashingService.Hash(
+      const passwordHash = await this.hashingService.hash(
         updateEmployeeDTO.password,
       );
 
@@ -117,7 +117,7 @@ export class EmployeesService {
     };
   }
 
-  async UpdateAdmin(
+  async updateAdmin(
     employeeIdDTO: UrlUuidDTO,
     updateEmployeeAdminDTO: UpdateEmployeeAdminDTO,
     tokenPayloadDTO: TokenPayloadDTO,
@@ -170,7 +170,7 @@ export class EmployeesService {
     return this.employeeRepository.save(employeeUpdate);
   }
 
-  async FindByEmail(email: string) {
+  async findByEmail(email: string) {
     const employeeFindByEmail = await this.employeeRepository.findOneBy({
       email,
       situation: EmployeeSituation.EMPLOYED,
@@ -183,7 +183,7 @@ export class EmployeesService {
     return employeeFindByEmail;
   }
 
-  async FindById(id: string) {
+  async findById(id: string) {
     const employeeFindByEmail = await this.employeeRepository.findOneBy({
       id,
       situation: EmployeeSituation.EMPLOYED,
@@ -196,7 +196,7 @@ export class EmployeesService {
     return employeeFindByEmail;
   }
 
-  async FindByName(paginationByNameDTO: PaginationByNameDTO) {
+  async findByName(paginationByNameDTO: PaginationByNameDTO) {
     const { limit, offset, value } = paginationByNameDTO;
 
     const [employeeFindByName, total] =
@@ -225,7 +225,7 @@ export class EmployeesService {
     return [total, ...employeeFindByName];
   }
 
-  async FindByRole(paginationByRoleDTO: PaginationByRoleDTO) {
+  async findByRole(paginationByRoleDTO: PaginationByRoleDTO) {
     const { limit, offset, value } = paginationByRoleDTO;
 
     const [employeeFindByRole, total] =

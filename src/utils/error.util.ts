@@ -7,15 +7,15 @@ import {
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { ErrorMessages } from 'src/interfaces/error-messages';
 import { QueryFailedError } from 'typeorm';
-import { GetErrorMessage } from './error-message.util';
+import { getErrorMessage } from './error-message.util';
 
-export function ErrorManagement(
+export function errorManagement(
   error: unknown,
   generalErrorType: GeneralErrorType,
   messages: ErrorMessages,
-) {
+): never {
   const logger = new Logger('errorManagement');
-  const manageError = GetErrorMessage(error);
+  const manageError = getErrorMessage(error);
 
   logger.error(
     `${messages.logger}: ${manageError}`,
@@ -36,11 +36,9 @@ export function ErrorManagement(
     throw error;
   }
 
-  switch (generalErrorType) {
-    case GeneralErrorType.INTERNAL:
-      throw new InternalServerErrorException(messages.generalError);
-
-    case GeneralErrorType.UNAUTHORIZED:
-      throw new UnauthorizedException(messages.generalError);
+  if (generalErrorType === GeneralErrorType.UNAUTHORIZED) {
+    throw new UnauthorizedException(messages.generalError);
   }
+
+  throw new InternalServerErrorException(messages.generalError);
 }

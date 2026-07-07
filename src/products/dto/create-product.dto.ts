@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsDateString,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -55,17 +56,21 @@ export class CreateProductDTO {
   })
   readonly price: string;
 
-  @IsNotEmpty({
-    message: 'Campo "quantidade" não preenchido',
-  })
-  @Transform(({ value }) => parseInt(value, 10))
+  // Estoque opcional: a loja não controla estoque. Quando ausente, o service
+  // grava 0 (coluna NOT NULL no banco) e nenhum fluxo trata esse valor.
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === ''
+      ? undefined
+      : parseInt(value, 10),
+  )
   @IsInt({
     message: 'Campo "quantidade" deve ser um número inteiro positivo',
   })
   @IsPositive({
     message: 'Campo "quantidade" deve ser um número inteiro positivo',
   })
-  readonly quantity: number;
+  readonly quantity?: number;
 
   @IsOptional()
   @IsInt({
@@ -77,11 +82,27 @@ export class CreateProductDTO {
   })
   readonly lowStock?: number;
 
-  @IsNotEmpty({
-    message: 'Campo "sku" não preenchido',
-  })
+  // SKU opcional: se não for informado, o service gera um automaticamente.
+  // (A coluna no banco é NOT NULL, então nunca fica vazia.)
+  @IsOptional()
   @IsString({
     message: 'O campo "sku" deve estar em formato de texto',
   })
-  readonly sku: string;
+  readonly sku?: string;
+
+  // Preço promocional opcional. Regras de negócio (menor que o preço,
+  // data futura) são validadas no service, que tem o preço efetivo.
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsDecimalString({
+    message: 'O campo "promoPrice" deve ser um string decimal ex: 59.99',
+  })
+  readonly promoPrice?: string;
+
+  @IsOptional()
+  @IsDateString(
+    {},
+    { message: 'O campo "promoEndsAt" deve ser uma data ISO válida' },
+  )
+  readonly promoEndsAt?: string;
 }

@@ -13,7 +13,6 @@ import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { GoogleAuthGuard } from './guards/google.guard';
 import { GoogleAuthUser } from './params/google-user.param';
 
-// @SkipCsrf()
 @SkipThrottle({ read: true, write: true, refresh: true, preference: true })
 @Controller('auth')
 export class AuthController {
@@ -24,11 +23,11 @@ export class AuthController {
 
   @Public()
   @Post('employee')
-  async LoginEmployee(
+  async loginEmployee(
     @Res({ passthrough: true }) res: Response,
     @Body() loginDto: LoginDTO,
   ) {
-    const createTokens = await this.authService.LoginEmployee(loginDto);
+    const createTokens = await this.authService.loginEmployee(loginDto);
 
     res.cookie('accessToken', createTokens.accessToken, {
       httpOnly: true,
@@ -57,11 +56,11 @@ export class AuthController {
 
   @Public()
   @Post('user')
-  async LoginUser(
+  async loginUser(
     @Res({ passthrough: true }) res: Response,
     @Body() loginDto: LoginDTO,
   ) {
-    const createTokens = await this.authService.LoginUser(loginDto);
+    const createTokens = await this.authService.loginUser(loginDto);
 
     res.cookie('accessToken', createTokens.accessToken, {
       httpOnly: true,
@@ -89,11 +88,11 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  async RegisterUser(
+  async registerUser(
     @Res({ passthrough: true }) res: Response,
     @Body() loginUserDto: LoginUserDTO,
   ) {
-    const createTokens = await this.authService.Register(loginUserDto);
+    const createTokens = await this.authService.register(loginUserDto);
 
     res.cookie('accessToken', createTokens.accessToken, {
       httpOnly: true,
@@ -121,22 +120,22 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
-  ForgotPassword(@Body() body: ResetPasswordDTO) {
-    return this.authService.ResetPassword(body);
+  forgotPassword(@Body() body: ResetPasswordDTO) {
+    return this.authService.resetPassword(body);
   }
 
   @Public()
   @Post('reset-password')
-  UpdatePassword(@Body() body: UpdatePasswordDTO) {
-    return this.authService.UpdatePassword(body);
+  updatePassword(@Body() body: UpdatePasswordDTO) {
+    return this.authService.updatePassword(body);
   }
 
   @Post('logout/employee')
-  async LogoutEmployee(
+  async logoutEmployee(
     @Body() logoutDto: LogoutDTO,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.LogoutEmployee(logoutDto);
+    await this.authService.logoutEmployee(logoutDto);
 
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
@@ -145,11 +144,11 @@ export class AuthController {
   }
 
   @Post('logout/user')
-  async LogoutUser(
+  async logoutUser(
     @Body() logoutDto: LogoutDTO,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.LogoutUser(logoutDto);
+    await this.authService.logoutUser(logoutDto);
 
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
@@ -161,13 +160,13 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('google/login')
-  GoogleLogin() {}
+  googleLogin() {}
 
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
-  async GoogleCallback(@GoogleAuthUser() user: User, @Res() res: Response) {
-    const createTokens = await this.authService.CreateTokensUser(user);
+  async googleCallback(@GoogleAuthUser() user: User, @Res() res: Response) {
+    const createTokens = await this.authService.createTokensUser(user);
 
     res.cookie('accessToken', createTokens.accessToken, {
       httpOnly: true,

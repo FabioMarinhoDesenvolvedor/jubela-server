@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -14,11 +12,16 @@ import { EmailService } from 'src/email/email.service';
 import { Product } from 'src/products/entities/product.entity';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/user.service';
-import { DataSource, In, QueryRunner, Repository } from 'typeorm';
+import {
+  DataSource,
+  FindManyOptions,
+  In,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
 
 import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
-import { PaymentStatus } from 'src/common/enums/payment-status.enum';
-import { ErrorManagement } from 'src/utils/error.util';
+import { errorManagement } from 'src/utils/error.util';
 import { CreateOrderItemDTO } from './dto/create-item.dto';
 import { PaginationAllOrdersDTO } from './dto/pagination-all-orders.dto';
 import { PaginationByPriceDTO } from './dto/pagination-by-price.dto';
@@ -27,7 +30,6 @@ import { PaginationByStatusDTO } from './dto/pagination-order-status.dto';
 import { PaginationDTO } from './dto/pagination-order.dto';
 import { Items } from './entities/items.entity';
 import { Order } from './entities/order.entity';
-import { PaymentConfirmation } from './entities/payment-confirmation.entity';
 
 @Injectable()
 export class OrdersService {
@@ -41,7 +43,7 @@ export class OrdersService {
     private dataSource: DataSource,
   ) {}
 
-  async Create(
+  async create(
     createOrderItemDTO: CreateOrderItemDTO[],
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
@@ -52,7 +54,6 @@ export class OrdersService {
     let findUser: User;
     let newOrderData: Order;
     let findProduct: Product;
-    let sendEmail = false;
     const itemsFromThisOrder: Items[] = [];
 
     try {
@@ -66,7 +67,7 @@ export class OrdersService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      const getTotalPrice = await this.PriceCalculate(
+      const getTotalPrice = await this.priceCalculate(
         createOrderItemDTO,
         queryRunner,
       );
@@ -89,7 +90,6 @@ export class OrdersService {
             id: createOrderItemDTO[i].product,
           },
           loadEagerRelations: false,
-          lock: { mode: 'pessimistic_write' },
         });
 
         if (!findProduct) {
@@ -105,42 +105,7 @@ export class OrdersService {
           product: findProduct,
         };
 
-        const { quantity, lowStock } = findProduct;
-
-        switch (true) {
-          case quantity < 1:
-            throw new BadRequestException(
-              `Produto ${findProduct.name} esgotado`,
-            );
-
-          case createOrderItemDTO[i].quantity > quantity:
-            throw new BadRequestException(
-              `Estoque do produto  ${findProduct.name} insuficiente`,
-            );
-
-          case quantity <= lowStock &&
-            quantity >= createOrderItemDTO[i].quantity:
-            sendEmail = true;
-            break;
-        }
-
-        const quantityUpdate =
-          findProduct.quantity - createOrderItemDTO[i].quantity;
-
-        const productQuantityUpdate = await queryRunner.manager.update(
-          Product,
-          findProduct.id,
-          {
-            quantity: quantityUpdate,
-          },
-        );
-
-        if (!productQuantityUpdate || productQuantityUpdate.affected < 1) {
-          throw new InternalServerErrorException(
-            `Erro ao atualizar quantidade do produto ${createOrderItemDTO[i].product_name}`,
-          );
-        }
-
+        // Estoque não é verificado nem descontado: a loja vende sob demanda.
         const orderItemCreate = queryRunner.manager.create(Items, itemData);
 
         itemsFromThisOrder.push(orderItemCreate);
@@ -150,10 +115,8 @@ export class OrdersService {
 
       await queryRunner.commitTransaction();
 
-      if (sendEmail === true) await this.emailService.LowStockWarn(findProduct);
-
       const createPreferenceObject =
-        this.ReturnItemsIPObject(itemsFromThisOrder);
+        this.returnItemsIPObject(itemsFromThisOrder);
 
       return {
         orderId: newOrderData.id,
@@ -166,7 +129,7 @@ export class OrdersService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao criar pedido e atualizar dados do produto',
         queryFailedError: 'Erro nas transações de dados do pedido',
         internalServerError: 'Erro ao processar o pedido',
@@ -178,7 +141,7 @@ export class OrdersService {
     }
   }
 
-  async PriceCalculate(
+  async priceCalculate(
     createOrderItemDTO: CreateOrderItemDTO[],
     queryRunner: QueryRunner,
   ) {
@@ -214,7 +177,7 @@ export class OrdersService {
     return totalPriceCents;
   }
 
-  ReturnItemsIPObject(items: Items[]) {
+  returnItemsIPObject(items: Items[]) {
     const itemsList = [];
     for (const item of items) {
       itemsList.push({
@@ -227,87 +190,7 @@ export class OrdersService {
     return itemsList;
   }
 
-  async StockRelease(order: Order) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      for (const item of order.items) {
-        const findProduct = await queryRunner.manager.findOne(Product, {
-          where: {
-            id: item.product.id,
-          },
-          lock: { mode: 'pessimistic_write' },
-          loadEagerRelations: false,
-        });
-
-        if (!findProduct) {
-          throw new NotFoundException(
-            `Produto ${item.product_name} não encontrado para ser devolvido ao estoque`,
-          );
-        }
-
-        const returnedQuantity = await queryRunner.manager.increment(
-          Product,
-          { id: findProduct.id },
-          'quantity',
-          item.quantity,
-        );
-
-        if (!returnedQuantity || returnedQuantity.affected < 1) {
-          throw new InternalServerErrorException(
-            `Erro ao tentar devolver unidades de produto ${item.product_name} ao estoque`,
-          );
-        }
-      }
-
-      const orderUpdate = await queryRunner.manager.update(Order, order.id, {
-        status: OrderStatus.CANCELED,
-        cancelReason: 'Expirado (1 hora sem pagamento)',
-        canceledAt: new Date(),
-      });
-
-      if (!orderUpdate || orderUpdate.affected === 0) {
-        throw new InternalServerErrorException('Erro ao atualizar pedido');
-      }
-
-      const paymentConfirmationUpdate = await queryRunner.manager.update(
-        PaymentConfirmation,
-        order.paymentConfirmation.id,
-        {
-          paymentStatus: PaymentStatus.FAILED,
-          errorMessage: 'Expirado (1 hora sem pagamento)',
-        },
-      );
-
-      if (
-        !paymentConfirmationUpdate ||
-        paymentConfirmationUpdate.affected === 0
-      ) {
-        throw new InternalServerErrorException(
-          'Erro ao atualizar dados de confirmação de pagamento',
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      return this.logger.log(`✅ Pedido ${order.id} expirado e liberado`);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
-        logger: `❌ Erro no cancelamento do pedido ${order.id}`,
-        queryFailedError: 'Erro na atualização dos dados do pedido cancelado',
-        internalServerError: 'Erro interno no cancelamento do pedido',
-        generalError: `Falha ao processar transação no cancelamento do pedido ${order.id}`,
-      });
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async FindById(id: string) {
+  async findById(id: string) {
     const orderFindById = await this.ordersRepository.findOne({
       where: {
         id,
@@ -325,7 +208,7 @@ export class OrdersService {
     return orderFindById;
   }
 
-  async ListOrdersEmployees(paginationAllOrders?: PaginationAllOrdersDTO) {
+  async listOrdersEmployees(paginationAllOrders?: PaginationAllOrdersDTO) {
     const { limit, offset } = paginationAllOrders;
 
     const [findAll, total] = await this.ordersRepository.findAndCount({
@@ -339,222 +222,110 @@ export class OrdersService {
     return [total, ...findAll];
   }
 
-  async ListOrdersUsers(tokenPayloadDTO: TokenPayloadDTO) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
-
-    if (!findUser) {
-      throw new UnauthorizedException('Ação não permitida');
-    }
+  async listOrdersUsers(tokenPayloadDTO: TokenPayloadDTO) {
+    const user = await this.requireUser(tokenPayloadDTO.sub);
 
     const [findAll, total] = await this.ordersRepository.findAndCount({
-      where: {
-        user: findUser,
-      },
-      order: {
-        id: 'desc',
-      },
+      where: { user },
+      order: { id: 'desc' },
     });
 
     return [total, ...findAll];
   }
 
-  async FindByPriceEmployees(paginationByPriceDTO: PaginationByPriceDTO) {
+  async findByPriceEmployees(paginationByPriceDTO: PaginationByPriceDTO) {
     const { limit, offset, value } = paginationByPriceDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.searchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        total_price: value,
-      },
+      order: { id: 'desc' },
+      where: { total_price: value },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
-  async FindByPriceUsers(
+  async findByPriceUsers(
     paginationByPriceDTO: PaginationByPriceDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
-
-    if (!findUser) {
-      throw new UnauthorizedException('Ação não permitida');
-    }
-
+    const user = await this.requireUser(tokenPayloadDTO.sub);
     const { limit, offset, value } = paginationByPriceDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.searchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        total_price: value,
-        user: findUser,
-      },
+      order: { id: 'desc' },
+      where: { total_price: value, user },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
-  async FindByItemEmployees(paginationDTO: PaginationDTO) {
+  async findByItemEmployees(paginationDTO: PaginationDTO) {
     const { limit, offset, value } = paginationDTO;
 
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
+    return this.searchOrders({
       take: limit,
       skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        items: {
-          product_name: value,
-        },
-      },
+      order: { id: 'desc' },
+      where: { items: { product_name: value } },
     });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
   }
 
-  async FindByItemUsers(
+  async findByItemUsers(
     paginationDTO: PaginationDTO,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
-    const findUser = await this.usersService.FindById(tokenPayloadDTO.sub);
+    const user = await this.requireUser(tokenPayloadDTO.sub);
+    const { limit, offset, value } = paginationDTO;
 
-    if (!findUser) {
+    return this.searchOrders({
+      take: limit,
+      skip: offset,
+      order: { id: 'desc' },
+      where: { items: { product_name: value }, user },
+    });
+  }
+
+  async findByStatus(paginationByStatusDTO: PaginationByStatusDTO) {
+    const { limit, offset, value } = paginationByStatusDTO;
+
+    return this.searchOrders({
+      take: limit,
+      skip: offset,
+      order: { id: 'desc' },
+      where: { status: value },
+    });
+  }
+
+  async findByUser(paginationByUserDTO: PaginationByUserDTO) {
+    const { limit, offset, value } = paginationByUserDTO;
+
+    return this.searchOrders({
+      take: limit,
+      skip: offset,
+      order: { id: 'desc' },
+      where: { user: { id: value } },
+      relations: { user: true },
+      select: { user: { id: true, name: true, email: true } },
+    });
+  }
+
+  private async requireUser(sub: string) {
+    const user = await this.usersService.findById(sub);
+
+    if (!user) {
       throw new UnauthorizedException('Ação não permitida');
     }
 
-    const { limit, offset, value } = paginationDTO;
-
-    const [orderFindByName, total] = await this.ordersRepository.findAndCount({
-      take: limit,
-      skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        items: {
-          product_name: value,
-        },
-        user: findUser,
-      },
-    });
-
-    if (!orderFindByName) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByName.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByName];
+    return user;
   }
 
-  async FindByStatus(paginationByStatusDTO: PaginationByStatusDTO) {
-    const { limit, offset, value } = paginationByStatusDTO;
+  private async searchOrders(options: FindManyOptions<Order>) {
+    const [orders, total] = await this.ordersRepository.findAndCount(options);
 
-    const [orderFindByStatus, total] = await this.ordersRepository.findAndCount(
-      {
-        take: limit,
-        skip: offset,
-        order: {
-          id: 'desc',
-        },
-        where: {
-          status: value,
-        },
-      },
-    );
-
-    if (!orderFindByStatus) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByStatus.length < 1) {
+    if (orders.length < 1) {
       throw new NotFoundException('Pedidos não encontrados');
     }
 
-    return [total, ...orderFindByStatus];
-  }
-
-  async FindByUser(paginationByUserDTO: PaginationByUserDTO) {
-    const { limit, offset, value } = paginationByUserDTO;
-
-    const [orderFindByUser, total] = await this.ordersRepository.findAndCount({
-      take: limit,
-      skip: offset,
-      order: {
-        id: 'desc',
-      },
-      where: {
-        user: {
-          id: value,
-        },
-      },
-      relations: {
-        user: true,
-      },
-      select: {
-        user: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    });
-
-    if (!orderFindByUser) {
-      throw new InternalServerErrorException(
-        'Erro desconhecido ao tentar pesquisar por pedidos',
-      );
-    }
-
-    if (orderFindByUser.length < 1) {
-      throw new NotFoundException('Pedidos não encontrados');
-    }
-
-    return [total, ...orderFindByUser];
+    return [total, ...orders];
   }
 }

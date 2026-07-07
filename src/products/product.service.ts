@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UploadApiResponse } from 'cloudinary';
+import { Decimal } from 'decimal.js';
 import 'multer';
 import { TokenPayloadDTO } from 'src/auth/dto/token-payload.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -14,13 +15,11 @@ import { GeneralErrorType } from 'src/common/enums/general-error-type.enum';
 import { EmailService } from 'src/email/email.service';
 import { EmployeesService } from 'src/employees/employee.service';
 import { Employee } from 'src/employees/entities/employee.entity';
-import { GetErrorMessage } from 'src/utils/error-message.util';
-import { ErrorManagement } from 'src/utils/error.util';
+import { getErrorMessage } from 'src/utils/error-message.util';
+import { errorManagement } from 'src/utils/error.util';
 import { DataSource, Like, QueryRunner, Repository } from 'typeorm';
 import { CreateProductDTO } from './dto/create-product.dto';
 import { PaginationByEmployeeDTO } from './dto/pagination-by-employee.dto';
-import { ProductFindByCategoryDTO } from './dto/product-find-by-category.dto';
-import { ProductFindByNameDTO } from './dto/product-find-by-name.dto';
 import { UpdatePriceProductDTO } from './dto/update-product-price.dto';
 import { UpdateProductDTO } from './dto/update-product.dto';
 import { ProductImages } from './entities/product-images.entity';
@@ -43,28 +42,103 @@ export class ProductsService {
     private dataSource: DataSource,
   ) {}
 
-  async Create(
+  /** Gera um SKU único quando o cadastro não informa um. */
+  private generateSku(): string {
+    const time = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `JUB-${time}-${rand}`;
+  }
+
+  /** Promoção persistida ainda válida: tem preço e não expirou. */
+  private isStoredPromoActive(product: Product): boolean {
+    if (product.promoPrice == null) return false;
+    return (
+      !product.promoEndsAt ||
+      new Date(product.promoEndsAt).getTime() > Date.now()
+    );
+  }
+
+  /**
+   * Valida a coerência de uma promoção contra o preço efetivo do produto.
+   * Regras: preço promocional > 0 e estritamente menor que o preço normal.
+   * A regra de "data no futuro" (e "data sem preço") só se aplica quando a
+   * promoção está sendo criada/alterada (`enforceFutureDate`), evitando
+   * bloquear uma simples mudança de preço por causa de uma promo já expirada.
+   */
+  private validatePromotion(
+    price: string,
+    promoPrice?: string | null,
+    promoEndsAt?: string | Date | null,
+    options: { enforceFutureDate?: boolean } = {},
+  ): void {
+    const { enforceFutureDate = true } = options;
+
+    if (promoPrice == null || promoPrice === '') {
+      if (promoEndsAt && enforceFutureDate) {
+        throw new BadRequestException(
+          'Informe o preço promocional para definir a data de término da promoção',
+        );
+      }
+      return;
+    }
+
+    const promo = new Decimal(promoPrice);
+
+    if (promo.lte(0)) {
+      throw new BadRequestException(
+        'O preço promocional deve ser maior que zero',
+      );
+    }
+
+    if (promo.gte(new Decimal(price))) {
+      throw new BadRequestException(
+        'O preço promocional deve ser menor que o preço normal',
+      );
+    }
+
+    if (promoEndsAt && enforceFutureDate) {
+      const ends = new Date(promoEndsAt);
+      if (Number.isNaN(ends.getTime())) {
+        throw new BadRequestException('Data de término da promoção inválida');
+      }
+      if (ends.getTime() <= Date.now()) {
+        throw new BadRequestException(
+          'A data de término da promoção deve ser no futuro',
+        );
+      }
+    }
+  }
+
+  async create(
     createProductDTO: CreateProductDTO,
     files: Array<Express.Multer.File>,
     tokenPayloadDTO: TokenPayloadDTO,
   ) {
     const { sub } = tokenPayloadDTO;
 
-    const findEmployee = await this.employeesService.FindById(sub);
+    const findEmployee = await this.employeesService.findById(sub);
 
     if (!findEmployee) {
       throw new NotFoundException('Funcionário não encontrado');
     }
 
+    // Valida a promoção antes do upload para não deixar imagens órfãs no
+    // Cloudinary caso a regra de negócio reprove o cadastro.
+    this.validatePromotion(
+      createProductDTO.price,
+      createProductDTO.promoPrice,
+      createProductDTO.promoEndsAt,
+    );
+
     let uploadResults: UploadApiResponse[];
 
     try {
-      uploadResults = await this.cloudinaryService.UploadMultipleImages(
+      uploadResults = await this.cloudinaryService.uploadMultipleImages(
         files,
         'products',
       );
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload das imagens:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao realizar upload de imagens',
@@ -77,21 +151,23 @@ export class ProductsService {
     await queryRunner.startTransaction();
 
     try {
-      const doesEmployeeReallyExists = await queryRunner.manager.findOne(
-        Employee,
-        {
-          where: {
-            id: tokenPayloadDTO.sub,
-          },
+      const existingEmployee = await queryRunner.manager.findOne(Employee, {
+        where: {
+          id: tokenPayloadDTO.sub,
         },
-      );
+      });
 
-      if (!doesEmployeeReallyExists) {
+      if (!existingEmployee) {
         throw new NotFoundException('Funcionário não encontrado');
       }
 
       const createProductData = {
         ...createProductDTO,
+        // SKU é opcional no cadastro; gera um identificador único quando ausente
+        // (coluna NOT NULL no banco). Formato: JUB-<base36 do tempo>-<aleatório>.
+        sku: createProductDTO.sku?.trim() || this.generateSku(),
+        // Estoque opcional (loja não controla estoque); coluna é NOT NULL.
+        quantity: createProductDTO.quantity ?? 0,
         employee: findEmployee,
       };
 
@@ -125,7 +201,7 @@ export class ProductsService {
         },
       });
 
-      if (!createProduct) {
+      if (!createdProduct) {
         throw new NotFoundException('Produto não encontrado');
       }
 
@@ -135,14 +211,12 @@ export class ProductsService {
 
       try {
         const publicIds = uploadResults.map((results) => results.public_id);
-        await this.cloudinaryService.DeleteMultipleImages(publicIds);
+        await this.cloudinaryService.deleteMultipleImages(publicIds);
       } catch (cleanupError) {
-        // Se cleanup falhar, loga mas não quebra a aplicação
         this.logger.error('Erro ao fazer cleanup das imagens:', cleanupError);
-        // Você pode enviar para um sistema de log/monitoramento aqui
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao cadastrar produto:',
         queryFailedError: 'Erro ao registrar produto',
         internalServerError: 'Erro interno cadastrar produto',
@@ -153,7 +227,7 @@ export class ProductsService {
     }
   }
 
-  async Update(
+  async update(
     id: string,
     imageId: string,
     updateProductDTO: UpdateProductDTO,
@@ -176,15 +250,34 @@ export class ProductsService {
         throw new NotFoundException('Produto não encontrado');
       }
 
+      // Valida a promoção contra o estado efetivo (campos do DTO sobrepõem os
+      // persistidos). A data-futura só é exigida quando a promoção em si está
+      // sendo alterada; mudar só o preço não deve esbarrar numa promo expirada.
+      const hasKey = (key: keyof UpdateProductDTO) => key in updateProductDTO;
+      const touchingPromo = hasKey('promoPrice') || hasKey('promoEndsAt');
+      if (touchingPromo || this.isStoredPromoActive(findProduct)) {
+        this.validatePromotion(
+          hasKey('price') ? updateProductDTO.price : findProduct.price,
+          hasKey('promoPrice')
+            ? updateProductDTO.promoPrice
+            : findProduct.promoPrice,
+          hasKey('promoEndsAt')
+            ? updateProductDTO.promoEndsAt
+            : findProduct.promoEndsAt,
+          { enforceFutureDate: touchingPromo },
+        );
+      }
+
       if (file) {
-        await this.ReplaceImage(findProduct, imageId, file, queryRunner);
+        await this.replaceImage(findProduct, imageId, file, queryRunner);
         updatesPerformed.push('image');
       }
 
-      await this.UpdateRegularData(findProduct, updateProductDTO, queryRunner);
+      await this.updateRegularData(findProduct, updateProductDTO, queryRunner);
 
-      for (let i = 0; i < Object.keys(updateProductDTO).length; i++) {
-        updatesPerformed.push(Object.keys(updateProductDTO));
+      const updatedFields = Object.keys(updateProductDTO);
+      if (updatedFields.length > 0) {
+        updatesPerformed.push(...updatedFields);
       }
 
       await queryRunner.commitTransaction();
@@ -202,7 +295,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao atualizar produto:',
         queryFailedError: 'Erro ao atualizar dados de produto',
         internalServerError: 'Erro interno ao atualizar produto',
@@ -213,7 +306,7 @@ export class ProductsService {
     }
   }
 
-  async UpdatePrice(
+  async updatePrice(
     id: string,
     updateProductPriceDataDTO: UpdatePriceProductDTO,
   ) {
@@ -225,6 +318,17 @@ export class ProductsService {
 
     if (!findProduct) {
       throw new NotFoundException('Produto não encontrado');
+    }
+
+    // Mexer só no preço não pode quebrar uma promoção ATIVA (preço novo deve
+    // continuar maior que o preço promocional). Promo expirada é ignorada.
+    if (this.isStoredPromoActive(findProduct)) {
+      this.validatePromotion(
+        updateProductPriceDataDTO.price,
+        findProduct.promoPrice,
+        findProduct.promoEndsAt,
+        { enforceFutureDate: false },
+      );
     }
 
     const productUpdate = await this.productsRepository.preload({
@@ -243,7 +347,7 @@ export class ProductsService {
     return updatedProduct;
   }
 
-  private async UpdateRegularData(
+  private async updateRegularData(
     product: Product,
     updateProductRegularDataDTO: UpdateProductDTO,
     queryRunnerSub: QueryRunner,
@@ -270,7 +374,7 @@ export class ProductsService {
    * Substitui uma imagem específica por outra
    * Mantém a ordem e se é principal ou não
    */
-  private async ReplaceImage(
+  private async replaceImage(
     product: Product,
     imageId: string,
     file: Express.Multer.File,
@@ -282,19 +386,18 @@ export class ProductsService {
       throw new NotFoundException('Imagem não encontrada');
     }
 
-    // Guarda informações da imagem antiga
     const { publicId: oldPublicId } = imageToReplace;
 
-    // 2. Upload da nova imagem ANTES da transação
+    // Upload da nova imagem antes da transação
     let uploadResult: UploadApiResponse;
     try {
-      const results = await this.cloudinaryService.UploadMultipleImages(
+      const results = await this.cloudinaryService.uploadMultipleImages(
         [file],
         'products',
       );
       uploadResult = results[0];
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload da imagem:',
         queryFailedError: '',
         internalServerError: 'Erro interno ao fazer upload de imagem',
@@ -302,29 +405,25 @@ export class ProductsService {
       });
     }
 
-    // 3. Transação: Atualiza no banco
-
-    // ✅ ATUALIZA a entidade existente (não cria nova)
+    // Atualiza a imagem existente, mantendo isMain e order
     imageToReplace.url = uploadResult.secure_url;
     imageToReplace.publicId = uploadResult.public_id;
-    // isMain e order permanecem iguais
 
     await queryRunnerSub.manager.save(ProductImages, imageToReplace);
 
-    // 4. Deleta a imagem antiga do Cloudinary
     try {
-      await this.cloudinaryService.DeleteMultipleImages([oldPublicId]);
+      await this.cloudinaryService.deleteMultipleImages([oldPublicId]);
     } catch (error) {
-      // Cleanup: deleta nova imagem do Cloudinary para não deixar órfã
+      // Reverte a nova imagem no Cloudinary para não deixar órfã
       try {
-        await this.cloudinaryService.DeleteMultipleImages([
+        await this.cloudinaryService.deleteMultipleImages([
           uploadResult.public_id,
         ]);
       } catch (cleanupError) {
         this.logger.error('Erro no cleanup:', cleanupError);
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao deletar imagem antiga do Cloudinary:',
         queryFailedError: 'Erro ao atualizar registro de imagem',
         internalServerError: 'Erro interno ao atualizar imagem',
@@ -336,7 +435,7 @@ export class ProductsService {
   /**
    * Adiciona novas imagens a um produto existente
    */
-  async AddImages(productId: string, files: Express.Multer.File[]) {
+  async addImages(productId: string, files: Express.Multer.File[]) {
     const product = await this.productsRepository.findOne({
       where: { id: productId },
       relations: {
@@ -348,7 +447,6 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    // Validação: limite máximo de imagens
     const MAX_IMAGES = 4;
     if (product.images.length + files.length > MAX_IMAGES) {
       throw new BadRequestException(
@@ -356,15 +454,14 @@ export class ProductsService {
       );
     }
 
-    // 1. Upload das novas imagens
     let uploadResults: UploadApiResponse[];
     try {
-      uploadResults = await this.cloudinaryService.UploadMultipleImages(
+      uploadResults = await this.cloudinaryService.uploadMultipleImages(
         files,
         'products',
       );
     } catch (error) {
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao fazer upload das imagens:',
         queryFailedError: '',
         internalServerError:
@@ -373,37 +470,31 @@ export class ProductsService {
       });
     }
 
-    // 2. Transação: Adiciona no banco
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const doesProductReallyExists = await queryRunner.manager.findOne(
-        Product,
-        {
-          where: {
-            id: productId,
-          },
+      const existingProduct = await queryRunner.manager.findOne(Product, {
+        where: {
+          id: productId,
         },
-      );
+      });
 
-      if (!doesProductReallyExists) {
+      if (!existingProduct) {
         throw new NotFoundException('Produto não encontrado');
       }
 
-      // Pega a maior ordem atual
       const currentMaxOrder =
         product.images.length > 0
           ? Math.max(...product.images.map((img) => img.order))
           : 0;
 
-      // Cria novas entidades de imagem
       const newImages = uploadResults.map((result, index) => {
         return queryRunner.manager.create(ProductImages, {
           url: result.secure_url,
           publicId: result.public_id,
-          isMain: false, // Novas imagens não são principais
+          isMain: false,
           order: currentMaxOrder + index + 1,
           product: product,
         });
@@ -422,15 +513,14 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      // Cleanup: deleta do Cloudinary
       const publicIds = uploadResults.map((r) => r.public_id);
       try {
-        await this.cloudinaryService.DeleteMultipleImages(publicIds);
+        await this.cloudinaryService.deleteMultipleImages(publicIds);
       } catch (cleanupError) {
         this.logger.error('Erro no cleanup:', cleanupError);
       }
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao adicionar imagens no banco de dados:',
         queryFailedError: 'Erro ao adicionar registros de imagens',
         internalServerError: 'Erro interno ao registrar imagens do produto',
@@ -441,7 +531,7 @@ export class ProductsService {
     }
   }
 
-  async RemoveImage(productId: string, imageId: string) {
+  async removeImage(productId: string, imageId: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -488,14 +578,13 @@ export class ProductsService {
       await queryRunner.commitTransaction();
 
       try {
-        await this.cloudinaryService.DeleteMultipleImages([publicIdToDelete]);
+        await this.cloudinaryService.deleteMultipleImages([publicIdToDelete]);
       } catch (cloudinaryError) {
-        // ⚠️ Banco já foi commitado, então não podemos reverter
-        // Loga o erro para investigação/cleanup manual
-        const errorMessage = GetErrorMessage(cloudinaryError);
+        // Banco já commitado: imagem fica órfã no Cloudinary, apenas loga
+        const errorMessage = getErrorMessage(cloudinaryError);
 
         this.logger.error(
-          `ATENÇÃO: Imagem deletada do banco mas falhou no Cloudinary:`,
+          `Imagem deletada do banco mas falhou no Cloudinary:`,
           {
             productId,
             imageId,
@@ -503,11 +592,6 @@ export class ProductsService {
             error: errorMessage,
           },
         );
-
-        // Aqui você poderia:
-        // - Adicionar em uma fila de cleanup
-        // - Enviar alerta para monitoramento
-        // - Gravar em tabela de "orphan_images" para cleanup posterior
       }
 
       return this.productsRepository.findOne({
@@ -519,7 +603,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao apagar imagens:',
         queryFailedError: 'Erro ao apagar registro de imagem',
         internalServerError: 'Erro interno ao remover imagem',
@@ -531,7 +615,7 @@ export class ProductsService {
     }
   }
 
-  async Delete(id: string) {
+  async delete(id: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -555,7 +639,7 @@ export class ProductsService {
       await queryRunner.commitTransaction();
 
       if (publicIdsToDelete.length > 0) {
-        await this.DeleteFromCloudinaryAsync(publicIdsToDelete).catch(
+        await this.deleteFromCloudinaryAsync(publicIdsToDelete).catch(
           (error) => {
             this.logger.error('Erro ao deletar do Cloudinary:', error);
           },
@@ -566,7 +650,7 @@ export class ProductsService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro ao excluir produto:',
         queryFailedError: 'Erro ao apagar registro de produto',
         internalServerError: 'Erro interno ao deletar produto',
@@ -577,17 +661,11 @@ export class ProductsService {
     }
   }
 
-  private async DeleteFromCloudinaryAsync(publicIds: string[]): Promise<void> {
+  private async deleteFromCloudinaryAsync(publicIds: string[]): Promise<void> {
     try {
-      await this.cloudinaryService.DeleteMultipleImages(publicIds);
+      await this.cloudinaryService.deleteMultipleImages(publicIds);
     } catch (error) {
-      // // Registra órfãos para cleanup
-      // await this.orphanCleanupService.logOrphanImages(
-      //   publicIds,
-      //   productId,
-      //   'Produto deletado',
-      // );
-      ErrorManagement(error, GeneralErrorType.INTERNAL, {
+      errorManagement(error, GeneralErrorType.INTERNAL, {
         logger: 'Erro do cloudinary - múltiplas imagens',
         queryFailedError: '',
         internalServerError: 'Erro interno ao deletar múltiplas imagens',
@@ -596,7 +674,7 @@ export class ProductsService {
     }
   }
 
-  async FindById(id: string) {
+  async findById(id: string) {
     const productFindById = await this.productsRepository.findOneBy({
       id,
     });
@@ -608,7 +686,7 @@ export class ProductsService {
     return productFindById;
   }
 
-  async ListProducts() {
+  async listProducts() {
     const items = await this.productsRepository.find({
       order: {
         id: 'desc',
@@ -619,11 +697,14 @@ export class ProductsService {
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async StockCheck(productId: string, orderQuantity: number, orderId?: string) {
+  async stockCheck(productId: string, orderQuantity: number) {
     const findProduct = await this.productsRepository.findOneBy({
       id: productId,
     });
+
+    if (!findProduct) {
+      throw new NotFoundException('Produto não encontrado');
+    }
 
     const { quantity, lowStock } = findProduct;
 
@@ -637,18 +718,18 @@ export class ProductsService {
         );
 
       case quantity <= lowStock && quantity >= orderQuantity:
-        await this.emailService.LowStockWarn(findProduct);
+        await this.emailService.lowStockWarn(findProduct);
         return;
     }
   }
 
-  async FindByName(nameParam: ProductFindByNameDTO) {
+  async findByName(name: string) {
     const productFindByName = await this.productsRepository.find({
       order: {
         id: 'desc',
       },
       where: {
-        name: Like(`${nameParam.name}%`),
+        name: Like(`${name}%`),
       },
     });
 
@@ -665,30 +746,30 @@ export class ProductsService {
     return productFindByName;
   }
 
-  async FindByCategory(categoryParam: ProductFindByCategoryDTO) {
-    const productFindByName = await this.productsRepository.find({
+  async findByCategory(category: string) {
+    const productFindByCategory = await this.productsRepository.find({
       order: {
         id: 'desc',
       },
       where: {
-        name: Like(`${categoryParam.category}%`),
+        category: Like(`${category}%`),
       },
     });
 
-    if (!productFindByName) {
+    if (!productFindByCategory) {
       throw new InternalServerErrorException(
         'Erro desconhecido ao tentar pesquisar por produtos',
       );
     }
 
-    if (productFindByName.length < 1) {
+    if (productFindByCategory.length < 1) {
       throw new NotFoundException('Produtos não encontrados');
     }
 
-    return productFindByName;
+    return productFindByCategory;
   }
 
-  async FindBySku(sku: string) {
+  async findBySku(sku: string) {
     const productFindBySku = await this.productsRepository.findOneBy({
       sku,
     });
@@ -700,7 +781,7 @@ export class ProductsService {
     return productFindBySku;
   }
 
-  async FindByEmployee(paginationByEmployeeDTO: PaginationByEmployeeDTO) {
+  async findByEmployee(paginationByEmployeeDTO: PaginationByEmployeeDTO) {
     const { limit, offset, value } = paginationByEmployeeDTO;
 
     const [productFindByEmployee, total] =
