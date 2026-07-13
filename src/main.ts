@@ -31,7 +31,13 @@ async function bootstrap() {
   );
 
   const allowedOrigins = [
+    'https://jubelabrasil.com.br',
+    'https://www.jubelabrasil.com.br',
     'https://jubela-client.vercel.app',
+    ...(process.env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   ];
 
   const isDevelopment = process.env.NODE_ENV === 'development';
