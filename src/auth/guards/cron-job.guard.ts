@@ -1,17 +1,15 @@
-// guards/cron-job.guard.ts
 import {
   CanActivate,
   ExecutionContext,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class CronJobGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-
-    console.log(request);
 
     const CRONJOB_WHITELIST = [
       '116.203.134.67',
@@ -25,18 +23,27 @@ export class CronJobGuard implements CanActivate {
       request.headers['x-forwarded-for']?.split(',')[0].trim() ??
       request.socket.remoteAddress;
 
-    console.log(ip);
-
     if (!CRONJOB_WHITELIST.includes(ip)) {
       throw new UnauthorizedException('IP não autorizado');
     }
 
     const secret = request.headers['x-cron-secret'];
+    const expected = process.env.CRONJOB_ORG_SECRET;
 
-    if (secret !== process.env.CRONJOB_ORG_SECRET) {
+    if (!secret || !expected || !this.safeEqual(secret, expected)) {
       throw new UnauthorizedException('Secret inválido');
     }
 
     return true;
+  }
+
+  // Comparação em tempo constante para não vazar o segredo por timing.
+  private safeEqual(a: string, b: string): boolean {
+    const bufferA = Buffer.from(a);
+    const bufferB = Buffer.from(b);
+
+    if (bufferA.length !== bufferB.length) return false;
+
+    return timingSafeEqual(bufferA, bufferB);
   }
 }

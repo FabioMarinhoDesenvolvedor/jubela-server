@@ -141,19 +141,13 @@ export class RefreshTokensService {
 
   async revokeAllUser(sub: User, isLogout: boolean, tokenId?: string) {
     try {
-      const findAllUserRT = await this.RTUserRepository.find({
-        where: {
-          user: {
-            id: sub.id,
-          },
-        },
-      });
-
-      for (let i = 0; i < findAllUserRT.length; i++) {
-        await this.RTEmployeeRepository.update(findAllUserRT[i].id, {
-          is_valid: false,
-        });
-      }
+      // Invalida todos os refresh tokens do usuário de uma vez. Antes o loop
+      // atualizava a tabela de FUNCIONÁRIOS (RTEmployeeRepository) com ids de
+      // token de usuário, então nada era revogado de fato no logout/reuso.
+      await this.RTUserRepository.update(
+        { user: { id: sub.id } },
+        { is_valid: false },
+      );
 
       if (isLogout) return;
 
@@ -187,7 +181,7 @@ export class RefreshTokensService {
         userId: sub.id,
         tokenId,
         occurredAt: `${day}/${month}/${year} - ${hourString}`,
-        loginUrl: 'https://jubela-client.vercel.app/login',
+        loginUrl: `${process.env.FRONTEND_URL ?? 'https://www.jubelabrasil.com.br'}/login`,
       };
 
       await this.emailsService.sendRTAlertUsers(alertData, true);

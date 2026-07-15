@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from 'src/auth/auth.module';
 import { AuthTokenGuard } from 'src/auth/guards/auth-token.guard';
+import { CsrfGuard } from 'src/auth/guards/csrf.guard';
 import { ThrottlerBehindProxyGuard } from 'src/auth/guards/throttler-behind-proxy.guard';
 import { EmailModule } from 'src/email/email.module';
 import { EmployeesModule } from 'src/employees/employee.module';
@@ -105,6 +106,12 @@ import { AppService } from './app.service';
   controllers: [AppController],
   providers: [
     AppService,
+    // Roda antes dos demais: barra requisições mutantes sem o header custom
+    // (defesa CSRF) antes de qualquer trabalho de autenticação.
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: AuthTokenGuard,

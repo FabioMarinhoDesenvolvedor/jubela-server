@@ -3,9 +3,36 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { getAllowedOrigins } from './common/allowed-origins';
 import { AppModule } from './app/app.module';
 
+// Falha rápido se um segredo obrigatório não estiver configurado, em vez de
+// subir com JWT_SECRET undefined (tokens assináveis por qualquer um) ou sem
+// acesso ao banco.
+function assertRequiredEnv() {
+  // Apenas o que é indispensável para o app funcionar — não subir sem isso é
+  // melhor do que subir quebrado (JWT_SECRET undefined, banco inacessível).
+  const required = [
+    'JWT_SECRET',
+    'DATABASE_HOST',
+    'DATABASE_PORT',
+    'DATABASE_USERNAME',
+    'DATABASE_PASSWORD',
+    'DATABASE_NAME',
+  ];
+
+  const missing = required.filter((name) => !process.env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Variáveis de ambiente obrigatórias ausentes: ${missing.join(', ')}`,
+    );
+  }
+}
+
 async function bootstrap() {
+  assertRequiredEnv();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
@@ -30,15 +57,7 @@ async function bootstrap() {
     }),
   );
 
-  const allowedOrigins = [
-    'https://jubelabrasil.com.br',
-    'https://www.jubelabrasil.com.br',
-    'https://jubela-client.vercel.app',
-    ...(process.env.CORS_ORIGINS ?? '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  ];
+  const allowedOrigins = getAllowedOrigins();
 
   const isDevelopment = process.env.NODE_ENV === 'development';
 

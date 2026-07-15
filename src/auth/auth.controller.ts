@@ -1,17 +1,31 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ResetPasswordDTO } from 'src/users/dto/reset-password.dto';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/user.service';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/set-metadata.decorator';
+import { TokenPayloadDTO } from './dto/token-payload.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 import { LoginDTO } from './dto/login.dto';
-import { LogoutDTO } from './dto/logout.dto';
 import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { GoogleAuthGuard } from './guards/google.guard';
 import { GoogleAuthUser } from './params/google-user.param';
+import { TokenPayloadParam } from './params/token-payload.param';
+
+// Destino do redirect pós-login social e dos links de e-mail. Configurável por
+// env para não fixar o domínio da Vercel; cai no domínio de produção.
+const FRONTEND_URL =
+  process.env.FRONTEND_URL ?? 'https://www.jubelabrasil.com.br';
 
 @SkipThrottle({ read: true, write: true, refresh: true, preference: true })
 @Controller('auth')
@@ -132,26 +146,32 @@ export class AuthController {
 
   @Post('logout/employee')
   async logoutEmployee(
-    @Body() logoutDto: LogoutDTO,
+    @Req() req: Request,
+    @TokenPayloadParam() tokenPayload: TokenPayloadDTO,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logoutEmployee(logoutDto);
+    // Identidade e token vêm do JWT autenticado (cookie), nunca do corpo da
+    // requisição — evita que um usuário logado revogue a sessão de outro.
+    const accessToken = req.cookies['accessToken'];
+    await this.authService.logoutEmployee(tokenPayload.email, accessToken);
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/refresh/employee' });
 
     return { success: true, message: 'Logout concluído' };
   }
 
   @Post('logout/user')
   async logoutUser(
-    @Body() logoutDto: LogoutDTO,
+    @Req() req: Request,
+    @TokenPayloadParam() tokenPayload: TokenPayloadDTO,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logoutUser(logoutDto);
+    const accessToken = req.cookies['accessToken'];
+    await this.authService.logoutUser(tokenPayload.email, accessToken);
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/refresh/user' });
 
     return { success: true, message: 'Logout concluído' };
   }
@@ -184,6 +204,6 @@ export class AuthController {
       path: '/refresh/user',
     });
 
-    res.redirect('https://jubela-client.vercel.app/');
+    res.redirect(`${FRONTEND_URL}/`);
   }
 }

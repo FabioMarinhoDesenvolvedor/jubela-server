@@ -9,7 +9,6 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Public } from 'src/auth/decorators/set-metadata.decorator';
 import { SetRoutePolicy } from 'src/auth/decorators/set-route-policy.decorator';
 import { TokenPayloadDTO } from 'src/auth/dto/token-payload.dto';
 import { RoutePolicyGuard } from 'src/auth/guards/route-policy.guard';
@@ -42,7 +41,6 @@ export class UsersController {
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
-  @Public()
   @UseGuards(RoutePolicyGuard)
   @Get('search/email/:email')
   @SetRoutePolicy(EmployeeRole.ADMIN)
@@ -51,7 +49,6 @@ export class UsersController {
   }
 
   @SkipThrottle({ write: true, auth: true, refresh: true, preference: true })
-  @Public()
   @UseGuards(RoutePolicyGuard)
   @Get('search/name/')
   @SetRoutePolicy(EmployeeRole.ADMIN)

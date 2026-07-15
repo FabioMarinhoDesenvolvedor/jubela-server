@@ -28,7 +28,6 @@ import { JWTBlacklist } from '../jwt-blacklist/entities/jwt_blacklist.entity';
 import jwtConfig from './config/jwt.config';
 import { LoginUserDTO } from './dto/login-user.dto';
 import { LoginDTO } from './dto/login.dto';
-import { LogoutDTO } from './dto/logout.dto';
 import { UpdatePasswordDTO } from './dto/update-password.dto';
 import { HashingServiceProtocol } from './hashing/hashing.service';
 
@@ -249,54 +248,51 @@ export class AuthService {
       success: true,
       email: findUser.email,
       name: findUser.name,
-      newPasswordHash: findUser.password_hash,
     };
   }
 
-  async logoutEmployee(logoutDto: LogoutDTO) {
-    const jwtBlacklistData = {
-      email: logoutDto.email,
-      token: logoutDto.token,
-    };
-
+  async logoutEmployee(email: string, token: string) {
     const findEmployee = await this.employeeRepository.findOne({
       where: {
-        email: logoutDto.email,
+        email,
       },
     });
 
+    if (!findEmployee) {
+      throw new UnauthorizedException('Funcionário não encontrado');
+    }
+
     await this.refreshTokenService.revokeAllEmployee(findEmployee, true);
 
-    const createLogout = this.jwtBlacklistRepository.create(jwtBlacklistData);
+    const createLogout = this.jwtBlacklistRepository.create({ email, token });
 
     const newLogout = await this.jwtBlacklistRepository.save(createLogout);
 
-    if (!createLogout || !newLogout) {
+    if (!newLogout) {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
     return 'Logout criado com sucesso';
   }
 
-  async logoutUser(logoutDto: LogoutDTO) {
-    const jwtBlacklistData = {
-      email: logoutDto.email,
-      token: logoutDto.token,
-    };
-
+  async logoutUser(email: string, token: string) {
     const findUser = await this.userRepository.findOne({
       where: {
-        email: logoutDto.email,
+        email,
       },
     });
 
+    if (!findUser) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+
     await this.refreshTokenService.revokeAllUser(findUser, true);
 
-    const createLogout = this.jwtBlacklistRepository.create(jwtBlacklistData);
+    const createLogout = this.jwtBlacklistRepository.create({ email, token });
 
     const newLogout = await this.jwtBlacklistRepository.save(createLogout);
 
-    if (!createLogout || !newLogout) {
+    if (!newLogout) {
       throw new InternalServerErrorException('Erro ao criar logout');
     }
 
