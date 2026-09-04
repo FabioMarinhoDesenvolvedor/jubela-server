@@ -1,10 +1,14 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import {
+  ClassSerializerInterceptor,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { getAllowedOrigins } from './common/allowed-origins';
 import { AppModule } from './app/app.module';
+import { getAllowedOrigins } from './common/allowed-origins';
 
 // Falha rápido se um segredo obrigatório não estiver configurado, em vez de
 // subir com JWT_SECRET undefined (tokens assináveis por qualquer um) ou sem
@@ -40,6 +44,10 @@ async function bootstrap() {
 
   app.set('trust proxy', 1);
 
+  app.use(helmet());
+
+  app.use(cookieParser());
+
   app.useBodyParser('json', {
     limit: '2mb',
   });
@@ -56,6 +64,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   const allowedOrigins = getAllowedOrigins();
 
@@ -91,9 +101,6 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     maxAge: 3600,
   });
-
-  app.use(helmet());
-  app.use(cookieParser());
 
   await app.listen(process.env.PORT ?? 3000);
 }

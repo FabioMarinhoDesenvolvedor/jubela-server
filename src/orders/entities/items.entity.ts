@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { Product } from 'src/products/entities/product.entity';
 import {
   Column,
@@ -27,9 +28,11 @@ export class Items {
 
   @ManyToOne(() => Order, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'order' })
+  @Type(() => Order)
   order: Order;
 
   @ManyToOne(() => Product, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'product' })
+  @Type(() => Product)
   product: Product;
 }

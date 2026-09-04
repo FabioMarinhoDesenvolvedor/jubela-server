@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { OrderStatus } from 'src/common/enums/order-status.enum';
 import { RefundReason } from 'src/common/enums/refund-reason.enum';
 import { User } from 'src/users/entities/user.entity';
@@ -24,9 +25,11 @@ export class Order {
   total_price: string;
 
   @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: true })
+  @Type(() => User)
   user: User;
 
   @OneToMany(() => Items, (item) => item.order)
+  @Type(() => Items)
   items: Items[];
 
   @Column({ type: 'enum', enum: OrderStatus })
@@ -82,6 +85,7 @@ export class Order {
     nullable: true,
   })
   @JoinColumn()
+  @Type(() => PaymentConfirmation)
   paymentConfirmation: PaymentConfirmation;
 
   @Column({

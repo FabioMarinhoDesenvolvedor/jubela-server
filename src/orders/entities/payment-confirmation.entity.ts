@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { PaymentStatus } from 'src/common/enums/payment-status.enum';
 import {
   Column,
@@ -36,6 +37,7 @@ export class PaymentConfirmation {
     cascade: true,
   })
   @JoinColumn()
+  @Type(() => Order)
   order: Order;
 
   @CreateDateColumn({ type: 'timestamptz' })

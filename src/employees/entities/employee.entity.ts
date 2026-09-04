@@ -1,3 +1,4 @@
+import { Exclude, Type } from 'class-transformer';
 import { IsEmail, IsString } from 'class-validator';
 import { EmployeeRole } from 'src/common/enums/employee-role.enum';
 import { EmployeeSituation } from 'src/common/enums/employee-situation.enum';
@@ -27,6 +28,7 @@ export class Employee {
 
   @Column({ type: 'varchar', length: 255 })
   @IsString()
+  @Exclude()
   password_hash: string;
 
   @Column({
@@ -44,9 +46,11 @@ export class Employee {
   situation: EmployeeSituation;
 
   @OneToMany(() => Product, (product) => product.employee)
+  @Type(() => Product)
   products: Product[];
 
   @OneToMany(() => RefreshTokenEmployee, (token) => token.employee)
+  @Type(() => RefreshTokenEmployee)
   refresh_tokens: RefreshTokenEmployee[];
 
   @CreateDateColumn()

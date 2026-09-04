@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -28,6 +29,7 @@ export class ProductImages {
   @ManyToOne(() => Product, (product) => product.images, {
     onDelete: 'CASCADE',
   })
+  @Type(() => Product)
   product: Product;
 
   @CreateDateColumn()

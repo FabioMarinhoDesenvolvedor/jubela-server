@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { Employee } from 'src/employees/entities/employee.entity';
 import {
   Column,
@@ -22,6 +23,7 @@ export class RefreshTokenEmployee {
   is_valid: boolean;
 
   @ManyToOne(() => Employee, { onDelete: 'RESTRICT' })
+  @Type(() => Employee)
   employee: Employee;
 
   @CreateDateColumn()

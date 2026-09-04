@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { User } from 'src/users/entities/user.entity';
 import {
   Column,
@@ -22,6 +23,7 @@ export class RefreshTokenUser {
   is_valid: boolean;
 
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+  @Type(() => User)
   user: User;
 
   @CreateDateColumn()

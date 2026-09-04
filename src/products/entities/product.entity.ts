@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { Employee } from 'src/employees/entities/employee.entity';
 import { Items } from 'src/orders/entities/items.entity';
 import {
@@ -42,6 +43,7 @@ export class Product {
     cascade: true,
     eager: true,
   })
+  @Type(() => ProductImages)
   images: ProductImages[];
 
   @Column({ type: 'int' })
@@ -54,9 +56,11 @@ export class Product {
   sku: string;
 
   @ManyToOne(() => Employee, { onDelete: 'RESTRICT' })
+  @Type(() => Employee)
   employee: Employee;
 
   @OneToMany(() => Items, (orderItem) => orderItem.product)
+  @Type(() => Items)
   orderItem: Items[];
 
   @CreateDateColumn()
